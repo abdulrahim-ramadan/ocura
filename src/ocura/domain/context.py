@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from ocura.domain.timer import TimerSnapshot
+
 
 @dataclass(frozen=True, slots=True)
 class Interruptible:
@@ -24,14 +26,14 @@ class Interruptible:
 @dataclass(frozen=True, slots=True)
 class Deferral:
     reason: str
-    #: Optional override for how long to wait before asking again, in seconds.
+    #: Seconds until the break should be offered again; None uses the schedule.
     retry_after: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RestSatisfied:
     reason: str
-    #: How long the observed rest lasted, in seconds. Informational, never a score.
+    #: How long the observed rest lasted, in seconds. Evidence, never a score.
     rested_for: float
 
 
@@ -42,4 +44,4 @@ INTERRUPTIBLE = Interruptible()
 
 @runtime_checkable
 class ContextSource(Protocol):
-    def assess(self, snapshot: object) -> ContextAssessment: ...
+    def assess(self, snapshot: TimerSnapshot) -> ContextAssessment: ...
