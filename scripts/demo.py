@@ -5,13 +5,16 @@ poke it by hand. P2 replaces this entirely with the real tray and window; nothin
 here is a preview of the UI, and no logic lives in this file that should not
 already be in the domain.
 
-    python scripts/demo.py [--ticks N] [--auto]
+    python scripts/demo.py [--ticks N] [--auto] [--real]
 
 Keys, read once per tick without blocking:
 
     b  take the break now      p  pause
     d  defer it                r  resume
     s  end the break early     q  quit
+
+--real swaps your keyboard for the actual P1 Windows detectors, so you can lock
+the machine or go fullscreen and watch the engine react.
 
 Windows only: it uses msvcrt for non-blocking keyboard reads. Standard library
 only, no PySide6.
@@ -36,6 +39,7 @@ from ocura.domain.errors import TransitionError
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import TimerSnapshot, TimerState
 from ocura.infrastructure.clock import SystemMonotonicClock, SystemWallClock
+from ocura.infrastructure.windows.context import build_windows_context
 
 SCHEDULE = BreakSchedule(focus_interval=10.0, break_duration=5.0, defer_interval=8.0)
 TICK_SECONDS = 1.0
@@ -55,6 +59,9 @@ class KeyboardContext:
     def __init__(self, interactive: bool) -> None:
         self.pending: ContextAssessment | None = None
         self._interactive = interactive
+
+    def poll(self) -> None:
+        """Nothing to observe: the keyboard is read by the loop, not by polling."""
 
     def assess(self, snapshot: TimerSnapshot) -> ContextAssessment:
         if self.pending is not None:
@@ -129,10 +136,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ticks", type=int, default=0, help="stop after N ticks (0 = until q)")
     parser.add_argument("--auto", action="store_true", help="take every break, ignore the keyboard")
+    parser.add_argument("--real", action="store_true", help="use the real Windows detectors")
     args = parser.parse_args()
 
-    context = KeyboardContext(interactive=not args.auto)
-    session = BreakSession(SCHEDULE, SystemMonotonicClock(), SystemWallClock(), context)
+    monotonic = SystemMonotonicClock()
+    context = (
+        build_windows_context(monotonic)
+        if args.real
+        else KeyboardContext(interactive=not args.auto)
+    )
+    session = BreakSession(SCHEDULE, monotonic, SystemWallClock(), context)
 
     print(__doc__.split("Keys,")[0].strip())
     print(
@@ -158,6 +171,9 @@ def main() -> int:
             except TransitionError as exc:
                 note = f"ignored: {exc}"
 
+        # Detectors observe every tick, not only when a break is owed: a lock that
+        # started twenty minutes ago has to have been watched all along.
+        context.poll()
         events = session.tick()
         print(render(started, session.snapshot(), events, note))
 
