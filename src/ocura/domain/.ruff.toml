@@ -1,0 +1,24 @@
+# Applies to src/ocura/domain/ only. Infrastructure is allowed — required, even —
+# to import these; the domain never is. This is the layer boundary from
+# docs/architecture.md, enforced by CI instead of by good intentions.
+extend = "../../../pyproject.toml"
+
+# This table REPLACES the one in pyproject.toml, it does not merge with it, so the
+# inherited PySide6 ban has to be restated here or the domain becomes the one layer
+# where a UI toolkit is allowed. Verified with a probe file, not assumed.
+[lint.flake8-tidy-imports.banned-api]
+"PySide6".msg = "No layer below the UI may import a UI toolkit."
+
+"ctypes".msg = "Platform access belongs in ocura.infrastructure. Add a protocol here instead."
+"ctypes.wintypes".msg = "Platform access belongs in ocura.infrastructure."
+"win32api".msg = "Platform access belongs in ocura.infrastructure."
+"win32con".msg = "Platform access belongs in ocura.infrastructure."
+"win32event".msg = "Platform access belongs in ocura.infrastructure."
+"win32gui".msg = "Platform access belongs in ocura.infrastructure."
+"win32process".msg = "Platform access belongs in ocura.infrastructure."
+"win32ts".msg = "Platform access belongs in ocura.infrastructure."
+"pywintypes".msg = "Platform access belongs in ocura.infrastructure."
+"winreg".msg = "Platform access belongs in ocura.infrastructure."
+"msvcrt".msg = "Platform access belongs in ocura.infrastructure."
+
+"sqlite3".msg = "Persistence belongs in ocura.infrastructure (P4). The domain holds no storage."

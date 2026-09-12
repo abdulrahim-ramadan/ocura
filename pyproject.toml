@@ -44,6 +44,7 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "TID"]
 
+# Platform and storage bans are scoped to src/ocura/domain/.ruff.toml, since
+# infrastructure is the layer that is supposed to import those.
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-"PySide6".msg = "The domain and application layers must stay framework-free."
-"ctypes".msg = "Windows access belongs in the infrastructure layer only."
+"PySide6".msg = "No layer below the UI may import a UI toolkit."
