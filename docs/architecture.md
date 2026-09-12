@@ -155,7 +155,11 @@ P1's idle/lock detector therefore carries the credit itself:
   reports it as `RestSatisfied` at the first tick where a break becomes owed
 - credit is **consumed once and then cleared** — one rest can never satisfy two
   breaks
-- credit **expires after 30 minutes**. Rest from three hours ago is not rest
+- credit **expires 30 minutes after the rest ended**. Staleness is measured from
+  the end of the rest, not from its start and not against its length: a
+  45-minute lock still counts in full the moment the user sits back down, and
+  goes stale half an hour later. Expiring long rests on arrival would punish
+  exactly the breaks that were most real. Rest from three hours ago is not rest
   now, and stale credit silently cancelling a genuine break is worse than no
   credit at all
 - the accumulating, expiring and clearing all live in
@@ -246,31 +250,62 @@ a UI dependency into the infrastructure layer and invert the direction of the
 architecture, so P1 polls once per second instead. At this scale the cost is
 nothing and the layering stays intact.
 
-### Two bugs the real API found that the tests could not
-
-Both were caught by running `api.py` against this machine, and both are recorded
-because they are the kind of mistake that reads as correct.
-
-**A maximized window is not a fullscreen window.** The first `PresentationDetector`
-compared the foreground window's rectangle to the monitor rectangle. A maximized
-window overhangs its monitor by the invisible resize border — measured here as
-`(-1088, -8, 8, 1928)` against a monitor of `(-1080, 0, 0, 1920)` — so it
-satisfied the comparison, and *every maximized window* would have read as
-fullscreen. Ocura would have deferred every break forever, which is the
-expensive direction of the asymmetry described above.
-`SHQueryUserNotificationState` is the OS's own answer to "is this a good moment
-to show something", it distinguishes maximized from fullscreen correctly, and it
-knows about presentation mode and Focus Assist besides.
-
-**`GetLastInputInfo` returns a 32-bit tick count.** Subtracting it from
-`GetTickCount64` is correct for 49.7 days and then reports decades of idleness
-forever after. The current tick is truncated to 32 bits and the difference taken
-modulo 2³², so the wrap cancels.
-
 `api.py` is the one module with no test coverage: it is the boundary where
 mocking stops meaning anything. Everything above it takes its signal as a plain
 callable, which is why the detectors are fully tested without a Windows API in
-sight.
+sight. What that buys in testability it gives back in risk, which the next
+section is about.
+
+## Verified against the real API
+
+Two defects in `api.py` were found by running it against a real Windows desktop
+and reading the numbers, not by testing and not by reasoning. Both versions read
+as obviously correct. They are recorded here with the measurements so that a
+future refactor cannot reintroduce either by arguing from first principles.
+
+**A maximized window is not a fullscreen window.**
+
+The first `PresentationDetector` asked whether the foreground window's rectangle
+covered its monitor's rectangle. Measured on a maximized (not fullscreen)
+terminal:
+
+```
+window rect : (-1088,  -8,    8, 1928)
+monitor     : (-1080,   0,    0, 1920)
+work area   : (-1080,   0,    0, 1920)
+=> covered the monitor on all four edges: True
+```
+
+A maximized window overhangs its monitor by the invisible 8px resize border, so
+it passes the test on every edge. The work area was identical to the monitor
+rectangle here, so falling back to that would not have helped either. *Every
+maximized window* would have read as fullscreen and Ocura would have deferred
+every break forever — a permanently silent app that looks like it is working.
+
+`SHQueryUserNotificationState` reports `QUNS_ACCEPTS_NOTIFICATIONS` (5) for that
+same window. It is the OS's own answer to "is this a good moment to show
+something", it distinguishes maximized from fullscreen correctly, and it knows
+about presentation mode and Focus Assist, which no rectangle comparison can.
+
+Do not replace it with geometry.
+
+**`GetLastInputInfo` returns a 32-bit tick count.**
+
+`LASTINPUTINFO.dwTime` is a `DWORD` sourced from `GetTickCount`, which wraps
+every 49.7 days. `GetTickCount64` does not. Subtracting one from the other is
+correct until the machine has been up for 49.7 days and then reports roughly
+`2**32 / 1000` seconds — about 50 days — of idleness, permanently, on every
+call. Ocura would deem the user eternally absent.
+
+```python
+now = _kernel32.GetTickCount64() & 0xFFFFFFFF
+return ((now - info.dwTime) & 0xFFFFFFFF) / 1000.0
+```
+
+Truncating to 32 bits and taking the difference modulo 2³² makes the wrap
+cancel. Do not "simplify" this by dropping the masks; nothing in the test suite
+or in a short manual run will notice, and the bug reappears after seven weeks of
+uptime.
 
 ## No flag for an owed break
 

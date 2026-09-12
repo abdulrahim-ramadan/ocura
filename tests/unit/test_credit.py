@@ -48,6 +48,26 @@ def test_credit_expires_at_the_staleness_window(clock: FakeMonotonicClock):
     assert ledger.take() is None
 
 
+def test_a_rest_longer_than_the_window_is_not_born_stale(clock: FakeMonotonicClock):
+    """Staleness measures when the rest ENDED, not how long it lasted.
+
+    A 45-minute lock against a 30-minute window still counts: they walked back to
+    the desk a moment ago. Expiring it would punish the longest genuine breaks.
+    """
+    ledger = RestCreditLedger(clock)
+    ledger.record(45 * 60.0, source="session lock")
+
+    credit = ledger.peek()
+    assert credit is not None
+    assert credit.seconds == 45 * 60.0
+
+    clock.advance(STALENESS_WINDOW - 1.0)
+    assert ledger.peek() is not None
+
+    clock.advance(1.0)
+    assert ledger.peek() is None
+
+
 def test_staleness_window_is_configurable(clock: FakeMonotonicClock):
     ledger = RestCreditLedger(clock, staleness_window=60.0)
     ledger.record(900.0, source="session lock")
