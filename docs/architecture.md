@@ -167,6 +167,43 @@ The domain keeps its existing veto either way: a credit shorter than
 `break_duration` is refused with `InsufficientRestError`, whatever the detector
 believes it saw.
 
+## What counts as rest: lock yes, idle no
+
+Two signals could plausibly mean "the user is away". Only one of them is allowed
+to discharge a break.
+
+**Session lock is satisfaction, unconditionally.** Locking is a deliberate act
+that means "I am leaving". There is no ambiguity in it and therefore no
+threshold on it: lock duration feeds the credit accumulator directly, subject
+only to the 30-minute staleness window and the domain's `break_duration` veto.
+
+**Idle alone is deferral only, and never satisfaction.** Not gated behind a
+setting, not configurable — excluded by design.
+
+The reason is the reading case. A person reading a long document produces no
+keyboard and no mouse input for many minutes while their eyes are in the worst
+state they get into: sustained fixation, blink rate collapsed. That user looks
+identical to an empty chair through `GetLastInputInfo`, and they are precisely
+the user who most needs the break. Crediting idleness as rest would make Ocura
+go quiet on them.
+
+The asymmetry of the two mistakes settles it. A break offered to someone who had
+already stepped away is a small cost — a notification nobody was there to see.
+A break silently cancelled for a reader is the product failing at its one job.
+When the evidence is ambiguous, Ocura pays the small cost.
+
+So idle **defers** the offer, because interrupting an empty chair accomplishes
+nothing, and the owed break simply waits and fires when they come back. Idle
+never discharges anything.
+
+The credit accumulator therefore observes lock duration only. Idle feeds
+`Deferral` and nothing else. The accumulator takes credit through a single
+entry point that names the source of the rest rather than hard-coding the lock
+detector, so a future signal can feed it without restructuring: P6 may add
+"idle **and** the foreground window has not changed for N minutes" as a reading
+discriminator, at which point long idle with a *changed* window becomes
+creditable. That is not built now, and idle remains non-creditable until it is.
+
 ## No flag for an owed break
 
 `DEFERRED` **is** the owed break, postponed. There is no `break_owed` field
