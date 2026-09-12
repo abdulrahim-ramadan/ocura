@@ -62,7 +62,10 @@ def test_deferral_reports_its_reason(
     clock.advance(schedule.focus_interval)
 
     events = session.tick()
-    assert events[-1].kind is SessionEventKind.BREAK_DEFERRED
+    assert [event.kind for event in events] == [
+        SessionEventKind.BREAK_DUE,
+        SessionEventKind.BREAK_DEFERRED,
+    ]
     assert events[-1].detail == "fullscreen"
     assert session.snapshot().break_owed is True
 
@@ -78,9 +81,79 @@ def test_satisfaction_discharges_the_owed_break(
     clock.advance(schedule.focus_interval)
 
     events = session.tick()
-    assert events[-1].kind is SessionEventKind.BREAK_SATISFIED
+    # break_due is announced even though the break is discharged on the same tick;
+    # P3 opens the overlay on break_started, never on break_due.
+    assert [event.kind for event in events] == [
+        SessionEventKind.BREAK_DUE,
+        SessionEventKind.BREAK_SATISFIED,
+    ]
+    assert events[-1].detail == "session locked"
     assert session.state is TimerState.FOCUSING
     assert session.snapshot().focus_elapsed == 0.0
+
+
+def test_rest_at_the_retry_deadline_satisfies_in_one_tick(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    context.queue.append(Deferral(reason="fullscreen"))
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+
+    # DEFERRED -> BREAK_DUE by the deadline, then BREAK_DUE -> FOCUSING by the rest.
+    context.queue.append(RestSatisfied(reason="session locked", rested_for=900.0))
+    clock.advance(schedule.defer_interval)
+    events = session.tick()
+
+    assert [event.kind for event in events] == [
+        SessionEventKind.BREAK_DUE,
+        SessionEventKind.BREAK_SATISFIED,
+    ]
+    assert session.state is TimerState.FOCUSING
+    assert session.snapshot().focus_elapsed == 0.0
+
+
+def test_still_unsuitable_at_the_retry_deadline_defers_again(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    context.queue.append(Deferral(reason="fullscreen"))
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+
+    context.queue.append(Deferral(reason="still fullscreen", retry_after=60.0))
+    clock.advance(schedule.defer_interval)
+    events = session.tick()
+
+    assert [event.kind for event in events] == [
+        SessionEventKind.BREAK_DUE,
+        SessionEventKind.BREAK_DEFERRED,
+    ]
+    assert session.state is TimerState.DEFERRED
+    assert session.snapshot().deferral_remaining == 60.0
+
+
+def test_the_context_source_is_consulted_once_per_tick(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    context.queue.append(Deferral(reason="fullscreen"))
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+    assert len(context.calls) == 1
+
+    clock.advance(schedule.defer_interval)
+    session.tick()
+    assert len(context.calls) == 2
 
 
 def test_detectors_are_left_alone_while_focusing(
