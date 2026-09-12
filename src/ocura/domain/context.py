@@ -12,6 +12,7 @@ different things and must not be collapsed into one boolean:
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -45,3 +46,55 @@ INTERRUPTIBLE = Interruptible()
 @runtime_checkable
 class ContextSource(Protocol):
     def assess(self, snapshot: TimerSnapshot) -> ContextAssessment: ...
+
+
+#: A detector is a context source that speaks for exactly one signal. Same
+#: contract, narrower remit; DetectorChain turns several of them into one source.
+ContextDetector = ContextSource
+
+
+def combine(assessments: Iterable[ContextAssessment]) -> ContextAssessment:
+    """Reduce several detectors' opinions to the one the policy will act on.
+
+    Rest beats deferral beats interruptible. Rest wins because it discharges the
+    break outright: if the user genuinely rested, a bad moment to interrupt is
+    moot, there is nothing left to interrupt them for.
+    """
+    rests: list[RestSatisfied] = []
+    deferrals: list[Deferral] = []
+    for assessment in assessments:
+        match assessment:
+            case RestSatisfied():
+                rests.append(assessment)
+            case Deferral():
+                deferrals.append(assessment)
+            case _:
+                pass
+
+    if rests:
+        # The longest observed rest is the most defensible evidence, and the one
+        # most likely to clear the domain's break_duration veto.
+        return max(rests, key=lambda rest: rest.rested_for)
+    if deferrals:
+        # Shortest explicit retry wins: asking again too early costs a wasted
+        # question, asking too late costs the moment the user became free.
+        explicit = [d.retry_after for d in deferrals if d.retry_after is not None]
+        return Deferral(
+            reason=", ".join(d.reason for d in deferrals),
+            retry_after=min(explicit) if explicit else None,
+        )
+    return INTERRUPTIBLE
+
+
+class DetectorChain:
+    """Consults every detector on every assessment; order does not change the result."""
+
+    def __init__(self, *detectors: ContextDetector) -> None:
+        self._detectors = detectors
+
+    @property
+    def detectors(self) -> tuple[ContextDetector, ...]:
+        return self._detectors
+
+    def assess(self, snapshot: TimerSnapshot) -> ContextAssessment:
+        return combine(detector.assess(snapshot) for detector in self._detectors)
