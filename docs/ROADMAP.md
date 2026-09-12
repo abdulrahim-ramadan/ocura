@@ -11,13 +11,14 @@ Break state machine, monotonic and calendar clock abstractions, schedule
 validation, deferral and satisfaction as distinct outcomes, deterministic tests,
 CI.
 
-## P1 — Windows context layer
+## P1 — Windows context layer (done)
 
 The signals that make an interruption well-timed:
 
-- idle detection
-- session lock and unlock
-- full screen and display state
+- idle detection (`GetLastInputInfo`)
+- session lock and unlock (`OpenInputDesktop`)
+- fullscreen, presentation mode and Focus Assist (`SHQueryUserNotificationState`)
+- screensaver state (`SPI_GETSCREENSAVERRUNNING`)
 
 All behind an extensible `ContextDetector` abstraction, so detectors can be
 added, replaced, or disabled without touching the state machine. P0 already

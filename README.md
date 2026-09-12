@@ -32,11 +32,15 @@ screen, display state — are platform-specific by nature.
 telemetry, no analytics. Nothing leaves the machine. When persistence arrives in
 P4, the schema will carry no user identifier of any kind.
 
-## Current status: P0, domain core only
+## Current status: P1, engine and Windows context
 
-P0 is the framework-free core: the break state machine, the clock abstractions
-it runs on, and the vocabulary for context-aware decisions. There is no user
-interface yet. Running `pytest` is currently the only way to exercise Ocura.
+P0 built the framework-free core: the break state machine, the clock
+abstractions it runs on, and the vocabulary for context-aware decisions. P1 adds
+the Windows detectors that decide when interrupting is appropriate.
+
+There is still no user interface. `pytest` and `python scripts/demo.py` — a
+terminal harness, not a preview of the UI — are currently the only ways to
+exercise Ocura.
 
 | Area | Status |
 | --- | --- |
@@ -46,7 +50,8 @@ interface yet. Running `pytest` is currently the only way to exercise Ocura.
 | Deferral and satisfaction as distinct outcomes | Implemented |
 | Context abstraction for future detectors | Implemented (vocabulary only) |
 | Deterministic test suite | Implemented |
-| Windows context detection (idle, session lock, full screen) | Planned, P1 |
+| Rest credit from session lock, expiring and spent once | Implemented |
+| Windows context detection (idle, session lock, fullscreen, screensaver) | Implemented |
 | Tray icon, main window | Planned, P2 |
 | Break overlay, countdown, notifications, snooze | Planned, P3 |
 | Persistence, settings, daily metrics | Planned, P4 |

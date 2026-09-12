@@ -204,6 +204,74 @@ detector, so a future signal can feed it without restructuring: P6 may add
 discriminator, at which point long idle with a *changed* window becomes
 creditable. That is not built now, and idle remains non-creditable until it is.
 
+## The P1 Windows context layer
+
+Four detectors, each answering for one signal, composed by `DetectorChain`:
+
+| Detector | Signal | Answer |
+| --- | --- | --- |
+| `SessionLockDetector` | `OpenInputDesktop` fails | `Deferral` while locked, `RestSatisfied` on return |
+| `IdleDetector` | `GetLastInputInfo` ≥ 120s | `Deferral`, never anything else |
+| `PresentationDetector` | `SHQueryUserNotificationState` | `Deferral` |
+| `ScreensaverDetector` | `SPI_GETSCREENSAVERRUNNING` | `Deferral` |
+
+Every detector is consulted on every assessment and the order they are listed in
+does not change the result, because `combine()` reduces their answers by rank
+rather than by position: **rest beats deferral beats interruptible**. Rest wins
+because it discharges the break outright — if the user genuinely rested, a bad
+moment to interrupt is moot, there is nothing left to interrupt them for.
+Returning from lunch into a fullscreen app therefore pays the break rather than
+postponing it. Among several deferrals the shortest explicit `retry_after` wins:
+asking again too early costs a wasted question, asking too late costs the moment
+the user became free.
+
+Adding a detector is adding one class with an `assess` method and one entry in
+`build_windows_context`. Nothing else changes, which is the whole point of the
+abstraction.
+
+### Two entry points, because a break is not always owed
+
+`assess()` runs only when a break is owed, which is right for deciding whether
+to interrupt and useless for watching a lock that started twenty minutes ago.
+`WindowsContext.poll()` therefore runs on **every** application tick and drives
+the observation that has to happen regardless — currently just the lock detector
+accumulating away-time into the ledger. The application loop calls `poll()` and
+then `tick()`; P2's UI timer will do the same.
+
+### Polling, not window messages
+
+Lock and unlock notifications (`WTSRegisterSessionNotification`,
+`WM_WTSSESSION_CHANGE`) need an `HWND` and a message pump. Taking them would drag
+a UI dependency into the infrastructure layer and invert the direction of the
+architecture, so P1 polls once per second instead. At this scale the cost is
+nothing and the layering stays intact.
+
+### Two bugs the real API found that the tests could not
+
+Both were caught by running `api.py` against this machine, and both are recorded
+because they are the kind of mistake that reads as correct.
+
+**A maximized window is not a fullscreen window.** The first `PresentationDetector`
+compared the foreground window's rectangle to the monitor rectangle. A maximized
+window overhangs its monitor by the invisible resize border — measured here as
+`(-1088, -8, 8, 1928)` against a monitor of `(-1080, 0, 0, 1920)` — so it
+satisfied the comparison, and *every maximized window* would have read as
+fullscreen. Ocura would have deferred every break forever, which is the
+expensive direction of the asymmetry described above.
+`SHQueryUserNotificationState` is the OS's own answer to "is this a good moment
+to show something", it distinguishes maximized from fullscreen correctly, and it
+knows about presentation mode and Focus Assist besides.
+
+**`GetLastInputInfo` returns a 32-bit tick count.** Subtracting it from
+`GetTickCount64` is correct for 49.7 days and then reports decades of idleness
+forever after. The current tick is truncated to 32 bits and the difference taken
+modulo 2³², so the wrap cancels.
+
+`api.py` is the one module with no test coverage: it is the boundary where
+mocking stops meaning anything. Everything above it takes its signal as a plain
+callable, which is why the detectors are fully tested without a Windows API in
+sight.
+
 ## No flag for an owed break
 
 `DEFERRED` **is** the owed break, postponed. There is no `break_owed` field
