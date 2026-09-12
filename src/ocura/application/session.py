@@ -78,6 +78,11 @@ class BreakSession:
         self._timer.reset()
         return self._event(SessionEventKind.STOPPED)
 
+    def skip_break(self) -> SessionEvent:
+        """End the break now. Ocura does not force breaks, so this is not a failure."""
+        self._timer.complete_break()
+        return self._event(SessionEventKind.BREAK_COMPLETED)
+
     def tick(self) -> list[SessionEvent]:
         events: list[SessionEvent] = []
         before = self._timer.state

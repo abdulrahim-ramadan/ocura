@@ -6,6 +6,7 @@ import pytest
 
 from ocura.application.session import BreakSession, SessionEventKind
 from ocura.domain.context import Deferral, RestSatisfied
+from ocura.domain.errors import TransitionError
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import TimerState
 
@@ -183,6 +184,26 @@ def test_a_deferral_in_flight_emits_nothing_until_the_deadline(
     clock.advance(schedule.defer_interval / 2)
     kinds = [event.kind for event in session.tick()]
     assert kinds == [SessionEventKind.BREAK_DUE, SessionEventKind.BREAK_STARTED]
+
+
+def test_skip_break_ends_it_early_and_resets_focus(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+    assert session.state is TimerState.ON_BREAK
+
+    clock.advance(schedule.break_duration / 3)
+    assert session.skip_break().kind is SessionEventKind.BREAK_COMPLETED
+    assert session.state is TimerState.FOCUSING
+    assert session.snapshot().focus_elapsed == 0.0
+
+
+def test_skip_break_rejected_when_not_on_a_break(session: BreakSession):
+    session.start()
+    with pytest.raises(TransitionError):
+        session.skip_break()
 
 
 def test_pause_and_resume_emit_events(session: BreakSession, clock: FakeMonotonicClock):
