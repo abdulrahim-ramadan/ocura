@@ -24,6 +24,13 @@ added, replaced, or disabled without touching the state machine. P0 already
 defines what a detector is allowed to say: `Interruptible`, `Deferral`, or
 `RestSatisfied`.
 
+Rest observed before a break is owed is carried as expiring credit by the
+detector itself, in `infrastructure/`, and reported at the first tick where a
+break becomes owed. The design and its constraints — consumed once, 30-minute
+staleness window — are specified in
+[architecture.md](architecture.md#rest-taken-before-a-break-is-owed). The domain
+does not change.
+
 Call detection is deliberately deferred. There is no reliable, privacy-respecting
 way to know a user is on a call across every conferencing app, and a detector
 that is wrong half the time makes the interruption decision worse, not better.

@@ -28,8 +28,13 @@ layer permitted to import platform APIs.
 session commands. It will not contain break logic, and no domain module will
 ever import it.
 
-`pyproject.toml` enforces part of this mechanically: `ruff`'s banned-api rule
-fails the build if `PySide6` or `ctypes` is imported anywhere it should not be.
+`ruff`'s banned-api rule enforces part of this mechanically, at two levels.
+`pyproject.toml` bans `PySide6` everywhere below the UI. `src/ocura/domain/.ruff.toml`
+additionally bans `ctypes`, `sqlite3`, `winreg`, `msvcrt` and the `win32*` modules
+inside the domain only — infrastructure is the layer that is supposed to import
+those. Note that the child table *replaces* the parent's rather than merging with
+it, so the domain config restates the `PySide6` ban; dropping that line would make
+the domain the one layer where a UI toolkit is allowed.
 
 ## Why the domain stays framework-free
 
@@ -91,6 +96,76 @@ discharges nothing.
 
 Keeping them apart is what lets P1 add real detectors without reopening the
 state machine.
+
+## What happens when two things land in the same tick
+
+The ordering is defined by two pieces of code, not left to chance.
+
+`BreakTimer.tick()` matches on a single subject, `self._state`, across three
+mutually exclusive guarded arms with no loop: **at most one time-driven
+transition per tick, and it never cascades**. A tick can move `FOCUSING ->
+BREAK_DUE`, but it cannot then move on to a third state on the same tick.
+
+`BreakSession.tick()` then fixes the order between the two kinds of event:
+
+1. time first — `self._timer.tick()`
+2. a gate — detectors are consulted only if a break is now owed
+3. context second — `policy.resolve(timer, context.assess(snapshot))`
+
+So a tick applies at most one time transition followed by at most one context
+transition, and the context source is called exactly once, only when its answer
+can change something. Time wins the ordering because whether a break is owed has
+to be settled before asking whether interrupting is wise.
+
+| Situation | States traversed in one tick | Events, in order |
+| --- | --- | --- |
+| Retry deadline reached, detector reports rest | `DEFERRED -> BREAK_DUE -> FOCUSING` | `break_due`, `break_satisfied` |
+| Retry deadline reached, still unsuitable | `DEFERRED -> BREAK_DUE -> DEFERRED` | `break_due`, `break_deferred` |
+| Focus interval expires, detector reports rest | `FOCUSING -> BREAK_DUE -> FOCUSING` | `break_due`, `break_satisfied` |
+| Focus interval expires, nothing in the way | `FOCUSING -> BREAK_DUE -> ON_BREAK` | `break_due`, `break_started` |
+
+Two state changes in one tick is normal and deterministic. These sequences are
+asserted in full, in order, by `tests/unit/test_session.py`.
+
+**A `break_due` event is not an instruction to interrupt.** It records that a
+decision point was reached, and it is emitted even when the break is discharged
+later in the same tick. The UI in P3 opens the break overlay on `break_started`
+and never on `break_due`; keying off `break_due` would flash an overlay for a
+break that was satisfied microseconds later.
+
+## Rest taken before a break is owed
+
+Rest during `FOCUSING` is **not** satisfaction. Nothing is owed yet, so there is
+nothing to discharge. It is a *pending observation*, and it is consumed at the
+next `BREAK_DUE`.
+
+This is why `satisfy_break` remains reachable only from `BREAK_DUE` and
+`DEFERRED`. The alternative — letting rest discharge a break that does not exist
+— would put a second, invisible accumulator inside `FOCUSING`, which is the same
+mistake as a stored `break_owed` flag wearing a different hat.
+
+The consequence is a requirement on P1, not on the domain. Without it, a
+twenty-minute lock at minute five of a focus block is invisible: the session
+gate never even consults the detector, focus accrues straight through the
+absence, and the user is prompted having just returned from twenty minutes away.
+
+P1's idle/lock detector therefore carries the credit itself:
+
+- it accumulates uninterrupted away-time while the session is `FOCUSING`, and
+  reports it as `RestSatisfied` at the first tick where a break becomes owed
+- credit is **consumed once and then cleared** — one rest can never satisfy two
+  breaks
+- credit **expires after 30 minutes**. Rest from three hours ago is not rest
+  now, and stale credit silently cancelling a genuine break is worse than no
+  credit at all
+- the accumulating, expiring and clearing all live in
+  `ocura/infrastructure/`. The domain never learns that pending credit exists;
+  it only ever sees a `RestSatisfied` arriving at a moment when a break is owed,
+  which is a thing it already understands
+
+The domain keeps its existing veto either way: a credit shorter than
+`break_duration` is refused with `InsufficientRestError`, whatever the detector
+believes it saw.
 
 ## No flag for an owed break
 
