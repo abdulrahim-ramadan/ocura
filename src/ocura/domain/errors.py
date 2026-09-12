@@ -11,3 +11,11 @@ class ConfigurationError(OcuraError):
 
 class TransitionError(OcuraError):
     """A command that the current timer state cannot serve."""
+
+
+class InsufficientRestError(OcuraError):
+    """Rest was reported, but too little of it to discharge an owed break.
+
+    Distinct from TransitionError: the transition itself is legal, the evidence
+    behind it is not.
+    """
