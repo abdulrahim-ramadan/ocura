@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ocura"
+version = "0.1.0"
+description = "Windows desktop app for better screen habits - context-aware break reminders."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Abdulrahim Ramadan", email = "Abdalrhim19991@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: Other/Proprietary License",
+    "Private :: Do Not Upload",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/abdulrahim-ramadan/ocura"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ocura"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.coverage.run]
+branch = true
+source = ["ocura"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"PySide6".msg = "The domain and application layers must stay framework-free."
+"ctypes".msg = "Windows access belongs in the infrastructure layer only."
