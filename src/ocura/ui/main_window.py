@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ocura.application.presenter import SessionView
+from ocura.ui.motion import MOTION
 from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import DashboardView, PlaceholderView
 
@@ -24,6 +25,7 @@ class MainWindow(QMainWindow):
     """Shell: navigation, geometry, and hide-to-tray. Renders nothing itself."""
 
     hidden = Signal()
+    themeToggled = Signal()
 
     def __init__(self, icon: QIcon, settings: QSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -85,10 +87,27 @@ class MainWindow(QMainWindow):
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             self._nav.addButton(button, index)
             layout.addWidget(button)
-        self._nav.idClicked.connect(self._pages.setCurrentIndex)
+        self._nav.idClicked.connect(self._show_page)
 
         layout.addStretch(1)
+
+        # Sidebar footer, not Settings: Settings is P5 and stays empty until it
+        # has a real settings model to write into.
+        self._theme_button = QPushButton()
+        self._theme_button.setObjectName("NavButton")
+        self._theme_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._theme_button.clicked.connect(self.themeToggled)
+        layout.addWidget(self._theme_button)
         return bar
+
+    def set_theme_name(self, name: str) -> None:
+        self._theme_button.setText("Light theme" if name == "dark" else "Dark theme")
+
+    def _show_page(self, index: int) -> None:
+        if index == self._pages.currentIndex():
+            return
+        self._pages.setCurrentIndex(index)
+        MOTION.fade_in(self._pages.currentWidget())
 
     def render(self, view: SessionView) -> None:
         self.dashboard.render(view)
