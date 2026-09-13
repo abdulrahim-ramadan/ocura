@@ -21,6 +21,9 @@ class SessionEventKind(StrEnum):
     STARTED = "started"
     BREAK_DUE = "break_due"
     BREAK_STARTED = "break_started"
+    #: Distinct from BREAK_STARTED so P4 can tell a break the user asked for from
+    #: one the engine offered.
+    BREAK_STARTED_BY_USER = "break_started_by_user"
     BREAK_COMPLETED = "break_completed"
     BREAK_DEFERRED = "break_deferred"
     BREAK_SATISFIED = "break_satisfied"
@@ -77,6 +80,11 @@ class BreakSession:
     def stop(self) -> SessionEvent:
         self._timer.reset()
         return self._event(SessionEventKind.STOPPED)
+
+    def take_break_now(self) -> SessionEvent:
+        """The user asked for a break, whether or not one was owed."""
+        self._timer.take_break_now()
+        return self._event(SessionEventKind.BREAK_STARTED_BY_USER)
 
     def skip_break(self) -> SessionEvent:
         """End the break now. Ocura does not force breaks, so this is not a failure."""

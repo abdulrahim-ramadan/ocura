@@ -26,6 +26,11 @@ _BREAK_OWED = frozenset({TimerState.BREAK_DUE, TimerState.DEFERRED})
 #: stays honest about the real stretch rather than freezing at the interval.
 _FOCUS_ACCRUING = frozenset({TimerState.FOCUSING, *_BREAK_OWED})
 
+#: The user may ask for a break from any state where they are at the screen. Kept
+#: separate from _FOCUS_ACCRUING despite matching it today: one is about counting
+#: time, this is about who is allowed to ask.
+_USER_MAY_TAKE_BREAK = frozenset({TimerState.FOCUSING, *_BREAK_OWED})
+
 
 class _Stopwatch:
     """Banked seconds plus, when running, the seconds since the last monotonic reading."""
@@ -112,6 +117,22 @@ class BreakTimer:
         if self._state is not TimerState.BREAK_DUE:
             raise TransitionError(f"cannot begin a break from {self._state}")
         now = self._clock.monotonic()
+        self._break.reset()
+        self._enter(TimerState.ON_BREAK, now)
+
+    def take_break_now(self) -> None:
+        """The user asked for a break.
+
+        Deliberately not a widened guard on begin_break. That command is the
+        engine accepting an owed break at a moment the context approved, and it
+        stays narrow so the engine cannot drift into a break on its own. This is
+        the user overriding all of that, which was never the thing being
+        prevented. Clears any owed deferral: a break just taken is not still owed.
+        """
+        if self._state not in _USER_MAY_TAKE_BREAK:
+            raise TransitionError(f"cannot take a break from {self._state}")
+        now = self._clock.monotonic()
+        self._retry_after = None
         self._break.reset()
         self._enter(TimerState.ON_BREAK, now)
 

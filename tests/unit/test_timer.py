@@ -301,6 +301,78 @@ def test_complete_break_rejected_outside_on_break(
         timer.complete_break()
 
 
+@pytest.mark.parametrize("state", [TimerState.FOCUSING, TimerState.BREAK_DUE, TimerState.DEFERRED])
+def test_the_user_may_take_a_break_from_any_state_at_the_screen(
+    timer: BreakTimer, clock: FakeMonotonicClock, state: TimerState
+):
+    timer.start()
+    if state in (TimerState.BREAK_DUE, TimerState.DEFERRED):
+        clock.advance(timer.schedule.focus_interval)
+        timer.tick()
+    if state is TimerState.DEFERRED:
+        timer.defer()
+    assert timer.state is state
+
+    timer.take_break_now()
+    assert timer.state is TimerState.ON_BREAK
+    assert timer.snapshot().break_remaining == timer.schedule.break_duration
+
+
+@pytest.mark.parametrize("state", [TimerState.IDLE, TimerState.ON_BREAK, TimerState.PAUSED])
+def test_the_user_cannot_take_a_break_they_are_already_on_or_have_stopped(
+    timer: BreakTimer, clock: FakeMonotonicClock, state: TimerState
+):
+    if state is not TimerState.IDLE:
+        timer.start()
+    if state is TimerState.ON_BREAK:
+        clock.advance(timer.schedule.focus_interval)
+        timer.tick()
+        timer.begin_break()
+    if state is TimerState.PAUSED:
+        timer.pause()
+    assert timer.state is state
+
+    with pytest.raises(TransitionError):
+        timer.take_break_now()
+
+
+def test_taking_a_break_clears_an_owed_deferral(due_timer: BreakTimer, clock: FakeMonotonicClock):
+    """A break just taken is not still owed, and its retry must not outlive it."""
+    due_timer.defer(retry_after=90.0)
+    due_timer.take_break_now()
+    clock.advance(due_timer.schedule.break_duration)
+    due_timer.tick()
+
+    assert due_timer.state is TimerState.FOCUSING
+    assert due_timer.snapshot().break_owed is False
+    assert due_timer.snapshot().focus_elapsed == 0.0
+
+    # The 90s override died with the deferral rather than shortening the next one.
+    clock.advance(due_timer.schedule.focus_interval)
+    due_timer.tick()
+    due_timer.defer()
+    assert due_timer.snapshot().deferral_remaining == due_timer.schedule.defer_interval
+
+
+def test_taking_a_break_early_resets_focus_when_it_completes(
+    timer: BreakTimer, clock: FakeMonotonicClock
+):
+    timer.start()
+    clock.advance(300.0)
+    timer.take_break_now()
+    clock.advance(timer.schedule.break_duration)
+
+    assert timer.tick() is TimerState.FOCUSING
+    assert timer.snapshot().focus_elapsed == 0.0
+
+
+def test_begin_break_stays_narrow(timer: BreakTimer):
+    """take_break_now is a separate command, not a widened guard on begin_break."""
+    timer.start()
+    with pytest.raises(TransitionError):
+        timer.begin_break()
+
+
 def test_defer_rejected_outside_break_due(timer: BreakTimer):
     timer.start()
     with pytest.raises(TransitionError):
