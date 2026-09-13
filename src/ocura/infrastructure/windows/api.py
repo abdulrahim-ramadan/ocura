@@ -22,6 +22,7 @@ _shell32 = ctypes.WinDLL("shell32", use_last_error=True)
 _wtsapi32 = ctypes.WinDLL("wtsapi32", use_last_error=True)
 
 SPI_GETSCREENSAVERRUNNING = 0x0072
+SPI_GETCLIENTAREAANIMATION = 0x1042
 DESKTOP_SWITCHDESKTOP = 0x0100
 
 WTS_CURRENT_SESSION = 0xFFFFFFFF
@@ -184,6 +185,20 @@ def is_screensaver_running() -> bool:
     if not _user32.SystemParametersInfoW(SPI_GETSCREENSAVERRUNNING, 0, ctypes.byref(running), 0):
         return False
     return bool(running.value)
+
+
+def animations_enabled() -> bool:
+    """Windows' reduced-motion setting, from Ease of Access.
+
+    Reported as "client area animation" rather than as a motion preference, but
+    it is the switch a user turns off when movement bothers them, so it is the
+    one to honour. Defaults to True when the query fails: motion is the normal
+    case and a failed read is not consent to remove it.
+    """
+    enabled = wintypes.BOOL(True)
+    if not _user32.SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, ctypes.byref(enabled), 0):
+        return True
+    return bool(enabled.value)
 
 
 def user_notification_state() -> int:

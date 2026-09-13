@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ocura.application.presenter import SessionView
+from ocura.ui.motion import MOTION
 from ocura.ui.theme import LAYOUT, SPACING
 
 
@@ -47,6 +48,7 @@ class DashboardView(QWidget):
         self._progress = QProgressBar()
         self._progress.setRange(0, 1000)
         self._progress.setTextVisible(False)
+        self._progress.setValue(0)  # default is minimum-1, which animates from -1
 
         self._waiting = _label("", "WaitingNote")
         self._waiting.hide()
@@ -68,11 +70,12 @@ class DashboardView(QWidget):
         self._events.setObjectName("EventList")
         self._events.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         self._events.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._last_headline = ""
 
         self._build()
 
     def _build(self) -> None:
-        status = _card()
+        status = self._status = _card()
         status_layout = QVBoxLayout(status)
         status_layout.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
         status_layout.setSpacing(SPACING.s)
@@ -142,10 +145,16 @@ class DashboardView(QWidget):
         root.addStretch(0)
 
     def render(self, view: SessionView) -> None:
+        # Fade on a real state change only. Doing it every tick would be a
+        # permanent flicker, which is the motion this app exists to avoid.
+        if view.headline != self._last_headline:
+            MOTION.fade_in(self._status)
+            self._last_headline = view.headline
+
         self._headline.setText(view.headline)
         self._display.setText(view.countdown_text)
         self._detail.setText(view.detail)
-        self._progress.setValue(int(view.progress * 1000))
+        MOTION.fill(self._progress, int(view.progress * 1000))
 
         if view.waiting_reason:
             self._waiting.setText(f"Waiting — {view.waiting_reason}")
