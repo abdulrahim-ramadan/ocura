@@ -16,21 +16,26 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3.12",
 ]
-dependencies = []
+dependencies = ["PySide6-Essentials>=6.7"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+dev = ["pytest>=8", "pytest-cov>=5", "pytest-qt>=4.4", "ruff>=0.6"]
+
+[project.scripts]
+ocura = "ocura.ui.app:main"
 
 [project.urls]
 Homepage = "https://github.com/abdulrahim-ramadan/ocura"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ocura"]
+artifacts = ["src/ocura/ui/*.qss"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-q"
+markers = ["gui: needs a real display; skipped where none exists"]
 
 [tool.coverage.run]
 branch = true
