@@ -140,14 +140,35 @@ def test_a_position_on_a_real_screen_is_left_alone(qtbot, icon, settings):
 
 
 def test_geometry_survives_a_round_trip(qtbot, icon, settings):
+    """What comes back is what was saved — not what was requested.
+
+    Do not reinstate `assert reopened.size() == QSize(900, 700)`. A window
+    manager is free to refuse a size, and the windows-latest CI runner does
+    exactly that: it clamped the height to 687 and turned an environment limit
+    into a red build. The round trip is the behaviour under test, so read the
+    size back after the resize and assert that value returns.
+    """
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
     window.resize(QSize(900, 700))
+    qtbot.wait(10)
+
+    saved = window.size()
     window._save_geometry()
 
     reopened = MainWindow(icon, settings)
     qtbot.addWidget(reopened)
-    assert reopened.size() == QSize(900, 700)
+    assert reopened.size() == saved
+
+
+def test_geometry_is_actually_written_to_settings(qtbot, icon, settings):
+    """Guards the round-trip test against passing on two identical defaults."""
+    window = MainWindow(icon, settings)
+    qtbot.addWidget(window)
+    assert settings.value("window/geometry") is None
+
+    window._save_geometry()
+    assert settings.value("window/geometry") is not None
 
 
 def test_navigation_switches_pages(qtbot, icon, settings):
