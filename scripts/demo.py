@@ -105,7 +105,10 @@ def render(started: float, snapshot: TimerSnapshot, events: list[SessionEvent], 
     stamp = f"[{int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}]"
     line = f"{stamp} {snapshot.state.upper():<10} {describe(snapshot)}"
     if events:
-        line += "   events: " + ", ".join(event.kind.value for event in events)
+        line += "   events: " + ", ".join(
+            f"{event.kind.value} ({event.detail})" if event.detail else event.kind.value
+            for event in events
+        )
     if note:
         line += f"   <- {note}"
     return line
