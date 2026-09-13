@@ -1,0 +1,7 @@
+# GUI tests drive the one layer allowed to import Qt, so they may import it too.
+# Everything else stays banned: a test has no business reaching for ctypes.
+extend = "../../pyproject.toml"
+
+[lint.flake8-tidy-imports.banned-api]
+"ctypes".msg = "Platform access belongs in ocura.infrastructure."
+"sqlite3".msg = "Persistence belongs in ocura.infrastructure (P4)."
