@@ -193,3 +193,34 @@ QScrollBar::handle:vertical {{
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     height: 0;
 }}
+
+/* --- pre-break toast --------------------------------------------------- */
+
+#Toast {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    border-radius: {radius_l};
+}}
+
+#ToastHeadline {{
+    color: {text};
+    font-size: {font_size_l};
+}}
+
+#ToastDetail {{
+    color: {text_muted};
+    font-size: {font_size_m};
+}}
+
+#ToastAction {{
+    background: transparent;
+    border: 1px solid {border};
+    border-radius: {radius_m};
+    color: {text_muted};
+    padding: {space_xs} {space_sm};
+}}
+
+#ToastAction:hover {{
+    border-color: {accent};
+    color: {text};
+}}

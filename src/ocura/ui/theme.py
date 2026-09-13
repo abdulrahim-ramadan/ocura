@@ -34,6 +34,8 @@ class Layout:
     sidebar_width: int = 200
     #: Long lines are hard to read and a maximised window is very wide.
     content_max_width: int = 760
+    #: Wide enough for one sentence, narrow enough to ignore.
+    toast_width: int = 320
 
 
 SPACING = Spacing()

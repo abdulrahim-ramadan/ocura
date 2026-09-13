@@ -78,6 +78,12 @@ class SessionView:
     #: Set only while a break is owed and something is in the way.
     waiting_reason: str | None
 
+    #: The pre-break warning is showing. One state, one moment to fire on.
+    warning_visible: bool
+    #: The break overlay should be on screen. Driven by ON_BREAK and nothing
+    #: else — never by BREAK_DUE, which is a decision point, not an occurrence.
+    overlay_visible: bool
+
     breaks_taken: int
     rests_credited: int
 
@@ -189,6 +195,8 @@ class BreakPresenter:
             countdown_text=countdown,
             progress=max(0.0, min(1.0, progress)),
             waiting_reason=self._waiting_reason if snapshot.break_owed else None,
+            warning_visible=state is TimerState.PRE_BREAK,
+            overlay_visible=state is TimerState.ON_BREAK,
             breaks_taken=self._breaks_taken,
             rests_credited=self._rests_credited,
             events=tuple(self._events),
@@ -202,6 +210,8 @@ class BreakPresenter:
             return f"Ocura — on a break, {view.countdown_text} left"
         if view.waiting_reason:
             return f"Ocura — waiting, {view.waiting_reason}"
+        if view.state is TimerState.PRE_BREAK:
+            return f"Ocura — break in {view.countdown_text}"
         if view.state is TimerState.PAUSED:
             return "Ocura — reminders paused"
         if view.state is TimerState.IDLE:
@@ -216,6 +226,8 @@ class BreakPresenter:
                 return "Not running", "Start a session when you are ready."
             case TimerState.FOCUSING:
                 return "Focusing", f"Next break in {_clock_text(focus_left)}."
+            case TimerState.PRE_BREAK:
+                return "Break soon", f"In {_clock_text(focus_left)}. Finish your thought."
             case TimerState.BREAK_DUE:
                 return "Break ready", "Whenever suits you."
             case TimerState.ON_BREAK:

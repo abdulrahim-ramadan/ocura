@@ -18,6 +18,7 @@ from ocura.ui.motion import Motion
 from ocura.ui.resources import app_icon
 from ocura.ui.single_instance import SingleInstance
 from ocura.ui.theme import DARK, DEFAULT_THEME, LIGHT, THEMES, stylesheet
+from ocura.ui.toast import BreakToast
 from ocura.ui.tray import Tray
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,7 @@ class OcuraApp:
         self.driver = TickDriver(presenter, app)
         self.window = MainWindow(icon, self._settings)
         self.tray = Tray(icon, app)
+        self.toast = BreakToast()
 
         app.setWindowIcon(icon)
         # Closing the last window must not end the process: the tray is the app.
@@ -95,6 +97,8 @@ class OcuraApp:
         self.tray.breakRequested.connect(self.driver.take_break_now)
         self.tray.quitRequested.connect(self.quit)
 
+        self.toast.snoozeRequested.connect(self._on_toast_snooze)
+
     # --- theme --------------------------------------------------------------
 
     @property
@@ -115,6 +119,18 @@ class OcuraApp:
     def _render(self, view: SessionView) -> None:
         self.window.render(view)
         self.tray.render(view, self.driver.presenter.tooltip())
+        self._render_toast(view)
+
+    def _render_toast(self, view: SessionView) -> None:
+        if view.warning_visible:
+            self.toast.render(f"A break in {view.countdown_text}", can_snooze=True)
+            if not self.toast.isVisible():
+                self.toast.show_near_tray()
+        elif self.toast.isVisible():
+            self.toast.hide()
+
+    def _on_toast_snooze(self) -> None:
+        self.toast.hide()
 
     def start(self) -> None:
         # Before the window: the tray is how Ocura is reached once the window is
@@ -125,6 +141,7 @@ class OcuraApp:
 
     def quit(self) -> None:
         self.driver.stop()
+        self.toast.hide()
         self.tray.hide()
         self._app.quit()
 

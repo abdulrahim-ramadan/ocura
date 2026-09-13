@@ -33,6 +33,8 @@ def a_view(**overrides) -> SessionView:
         countdown_text="15:00",
         progress=0.25,
         waiting_reason=None,
+        warning_visible=False,
+        overlay_visible=False,
         breaks_taken=2,
         rests_credited=1,
         events=(),

@@ -37,11 +37,58 @@ def test_break_due_fires_at_exactly_the_configured_duration(
 ):
     timer.start()
     clock.advance(timer.schedule.focus_interval - 0.001)
-    assert timer.tick() is TimerState.FOCUSING
+    # PRE_BREAK by now, but the break itself is not owed a moment early.
+    assert timer.tick() is not TimerState.BREAK_DUE
+    assert timer.snapshot().break_owed is False
 
     clock.advance(0.001)
     assert timer.tick() is TimerState.BREAK_DUE
     assert timer.snapshot().break_owed is True
+
+
+def test_the_warning_fires_exactly_one_warning_period_early(
+    timer: BreakTimer, clock: FakeMonotonicClock
+):
+    warning_at = timer.schedule.focus_interval - timer.schedule.pre_break_warning
+    timer.start()
+
+    clock.advance(warning_at - 0.001)
+    assert timer.tick() is TimerState.FOCUSING
+
+    clock.advance(0.001)
+    assert timer.tick() is TimerState.PRE_BREAK
+    # Still focusing as far as the count is concerned; nothing is owed yet.
+    assert timer.snapshot().break_owed is False
+
+
+def test_the_warning_state_keeps_accruing_focus(timer: BreakTimer, clock: FakeMonotonicClock):
+    timer.start()
+    clock.advance(timer.schedule.focus_interval - timer.schedule.pre_break_warning)
+    timer.tick()
+    clock.advance(10.0)
+
+    assert timer.state is TimerState.PRE_BREAK
+    assert timer.snapshot().focus_elapsed == (
+        timer.schedule.focus_interval - timer.schedule.pre_break_warning + 10.0
+    )
+
+
+def test_a_pause_during_the_warning_resumes_into_it(timer: BreakTimer, clock: FakeMonotonicClock):
+    timer.start()
+    clock.advance(timer.schedule.focus_interval - timer.schedule.pre_break_warning)
+    timer.tick()
+
+    timer.pause()
+    clock.advance(9999.0)
+    timer.resume()
+    assert timer.state is TimerState.PRE_BREAK
+
+
+def test_a_long_stall_goes_straight_past_the_warning(timer: BreakTimer, clock: FakeMonotonicClock):
+    """A machine asleep through the whole block should not stop to warn first."""
+    timer.start()
+    clock.advance(timer.schedule.focus_interval * 3)
+    assert timer.tick() is TimerState.BREAK_DUE
 
 
 def test_focus_keeps_accruing_while_a_break_goes_untaken(
