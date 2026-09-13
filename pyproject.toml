@@ -29,7 +29,7 @@ Homepage = "https://github.com/abdulrahim-ramadan/ocura"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ocura"]
-artifacts = ["src/ocura/ui/*.qss"]
+artifacts = ["src/ocura/ui/*.qss", "src/ocura/ui/assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 from ocura.application.presenter import SessionView
+
+logger = logging.getLogger(__name__)
 
 
 class Tray(QObject):
@@ -39,8 +43,25 @@ class Tray(QObject):
         self._icon.setContextMenu(self._menu)
         self._icon.activated.connect(self._on_activated)
 
-    def show(self) -> None:
+    def show(self) -> bool:
+        """Show the icon, reporting whether it actually appeared.
+
+        A QSystemTrayIcon that is constructed but never shown, or whose owner is
+        collected, fails silently and leaves no way to reach the app once the
+        window is hidden. Windows also files new icons into the hidden overflow
+        area by default, which looks identical to a bug.
+        """
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            logger.error("no system tray available; Ocura will have no tray icon")
+            return False
+
         self._icon.show()
+        if not self._icon.isVisible():
+            logger.error("the tray icon was shown but is not visible")
+            return False
+
+        logger.info("tray icon shown")
+        return True
 
     def hide(self) -> None:
         self._icon.hide()

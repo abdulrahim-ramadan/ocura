@@ -1,7 +1,7 @@
-"""Generate assets/icons/ocura.ico. Pure stdlib, no image library.
+"""Regenerate the fallback icon. Pure stdlib, no image library.
 
-A calm lens: a soft ring with an open centre. Deliberately plain — P6 owns the
-visual identity, and an invented logo now would only have to be thrown away.
+Not the shipped icon: ocura.png beside it is, and this only stands in if that
+file is missing. A calm lens, deliberately plain — P6 owns the visual identity.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-OUT = Path(r"D:\projects\ocura\assets\icons\ocura.ico")
+OUT = Path(__file__).resolve().parent.parent / "src" / "ocura" / "ui" / "assets" / "ocura.ico"
 SIZES = (16, 24, 32, 48, 64, 128, 256)
 SS = 4  # supersampling factor for anti-aliasing
 

@@ -25,11 +25,9 @@ def pytest_collection_modifyitems(items):
 
 @pytest.fixture
 def icon():
-    from PySide6.QtGui import QIcon
+    from ocura.ui.resources import app_icon
 
-    from ocura.ui.app import ICON_PATH
-
-    return QIcon(str(ICON_PATH))
+    return app_icon()
 
 
 @pytest.fixture
@@ -38,3 +36,18 @@ def settings(tmp_path):
     from PySide6.QtCore import QSettings
 
     return QSettings(str(tmp_path / "ocura.ini"), QSettings.Format.IniFormat)
+
+
+@pytest.fixture(autouse=True)
+def still():
+    """Widget tests assert final values, so motion is off unless asked for.
+
+    Animation is verified on its own terms in the motion tests rather than by
+    making every other test wait for a fade to finish.
+    """
+    from ocura.ui.motion import MOTION
+
+    was = MOTION.enabled
+    MOTION.enabled = False
+    yield MOTION
+    MOTION.enabled = was
