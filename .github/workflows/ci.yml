@@ -25,5 +25,28 @@ jobs:
       - name: Format
         run: ruff format --check .
 
+      - name: Report the display the runner gives us
+        run: python -c "from PySide6.QtWidgets import QApplication; from PySide6.QtGui import QGuiApplication; app = QApplication([]); s = QGuiApplication.primaryScreen(); g = s.availableGeometry(); print(f'screen {g.width()}x{g.height()} dpr={s.devicePixelRatio()} platform={app.platformName()}')"
+
       - name: Test
-        run: pytest
+        run: |
+          pytest --tb=short 2>&1 | Tee-Object -FilePath pytest.log
+          exit $LASTEXITCODE
+
+      # Log downloads need admin rights even on a public repository, so surface
+      # failures as check annotations, which the API serves to anyone.
+      - name: Annotate failures
+        if: failure()
+        run: |
+          if (Test-Path pytest.log) {
+            Get-Content pytest.log |
+              Select-String -Pattern '^(FAILED|ERROR)' |
+              ForEach-Object { "::error::$($_.Line)" }
+          }
+
+      - name: Keep the test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-log
+          path: pytest.log

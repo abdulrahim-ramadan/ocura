@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import pytest
 from PySide6.QtCore import QPoint, QSize
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QMainWindow
 
 from ocura.application.presenter import EventLine, SessionView
@@ -116,8 +117,6 @@ def test_closing_hides_instead_of_quitting(qtbot, icon, settings):
 
 def test_an_off_screen_position_falls_back_to_the_primary(qtbot, icon, settings):
     """A saved position can name a monitor that is no longer attached."""
-    from PySide6.QtGui import QGuiApplication
-
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
     window.resize(QSize(880, 640))
@@ -129,8 +128,6 @@ def test_an_off_screen_position_falls_back_to_the_primary(qtbot, icon, settings)
 
 
 def test_a_position_on_a_real_screen_is_left_alone(qtbot, icon, settings):
-    from PySide6.QtGui import QGuiApplication
-
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
     target = QGuiApplication.primaryScreen().availableGeometry().topLeft() + QPoint(120, 120)
@@ -140,34 +137,51 @@ def test_a_position_on_a_real_screen_is_left_alone(qtbot, icon, settings):
     assert window.pos() == target
 
 
-def test_geometry_survives_a_round_trip(qtbot, icon, settings):
-    """What comes back is what was saved — not what was requested.
+def test_geometry_round_trips_through_settings(qtbot, icon, settings):
+    """What Ocura stores is what it reads back. The bytes are the contract.
 
-    Do not reinstate an assertion against a hardcoded QSize. A window manager is
-    free to refuse a size, and the windows-latest CI runner does exactly that:
-    it clamped a requested 900x700 to 900x687 and turned an environment limit
-    into a red build. What is under test is that QSettings gives back what it
-    was given, so the expected value is read from the window after the resize,
-    never written as a literal.
+    Do not assert a restored *size* here, with or without a literal. Two earlier
+    versions of this test did and both failed in CI for different environmental
+    reasons: a window manager may refuse a requested size (the runner clamped
+    900x700 to 900x687), and restoreGeometry deliberately refits a window to the
+    current screen (offscreen reproduced 900x700 coming back as 798x700).
+    Neither is a defect in Ocura, and neither is what this test is for. Saving
+    and loading the blob is our code; how Qt then fits a window onto a display
+    is Qt's, and it is covered by the pull-onto-a-screen tests.
     """
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
     window.resize(QSize(900, 700))
     qtbot.wait(10)
 
-    saved = window.size()
+    expected = window.saveGeometry()
     window._save_geometry()
 
-    # Restored into a plain window rather than a MainWindow: reopening runs
-    # _pull_onto_a_screen, which is allowed to move and resize the window when
-    # the saved position no longer fits any display. That policy is covered by
-    # its own tests, and letting it run here would put a second environment
-    # dependency into the assertion.
+    assert settings.value("window/geometry") == expected
+
+    # And the stored blob is something Qt will actually accept back.
     probe = QMainWindow()
     qtbot.addWidget(probe)
     assert probe.restoreGeometry(settings.value("window/geometry"))
+
+
+def test_a_reopened_window_gets_its_size_back_on_a_screen_that_allows_it(qtbot, icon, settings):
+    """The behavioural half, asserted only where the platform can honour it."""
+    available = QGuiApplication.primaryScreen().availableGeometry()
+    if available.width() < 1100 or available.height() < 900:
+        pytest.skip(f"display is {available.width()}x{available.height()}; too small to refit into")
+
+    window = MainWindow(icon, settings)
+    qtbot.addWidget(window)
+    window.resize(QSize(900, 700))
     qtbot.wait(10)
-    assert probe.size() == saved
+    saved = window.size()
+    window._save_geometry()
+
+    reopened = MainWindow(icon, settings)
+    qtbot.addWidget(reopened)
+    qtbot.wait(10)
+    assert reopened.size() == saved
 
 
 def test_geometry_is_actually_written_to_settings(qtbot, icon, settings):
