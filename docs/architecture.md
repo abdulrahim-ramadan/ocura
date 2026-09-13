@@ -321,17 +321,52 @@ sleep. Measured against `WTSQuerySessionInformationW` across one real lock:
 01:08  WTS SessionFlags -> 1 (unlocked)    OpenInputDesktop -> handle
 ```
 
-A 30-second absence was therefore measured as 3 seconds. The consequence was
-silent and instructive: 3s is shorter than the demo's 5s `break_duration`, so
-`satisfy_break` refused the credit with `InsufficientRestError`, the policy
-turned that into `NoAction`, and no break was ever discharged. **Every part of
-the rest-credit mechanism was correct and it produced nothing, because it was
-being fed a bad measurement.** A wrong number is harder to see than a wrong
-branch.
+Worse than lagging, it **oscillates**. Across one continuous lock, with WTS
+holding `LOCKED` from 00:31 to 01:16 without interruption:
+
+```
+00:31  OpenInputDesktop -> NULL     (LOCKED)
+00:32  OpenInputDesktop -> handle   (unlocked)   <- the session never unlocked
+01:13  OpenInputDesktop -> NULL     (LOCKED)
+01:16  OpenInputDesktop -> handle   (unlocked)   <- the real unlock
+```
+
+This is the stronger argument, and it is fatal rather than merely inaccurate.
+`SessionLockDetector.observe()` banks the elapsed away-time and clears
+`_locked_since` the moment its signal reads unlocked, so a flip mid-lock does
+not shorten the measurement — it *restarts* it. The 45-second absence above was
+recorded as a 1-second fragment followed by a 3-second one, and because a newer
+credit replaces an older one rather than summing, only the 3 seconds survived.
+**No amount of staying away could ever have produced enough credit**, at any
+schedule, on any machine where the signal flickers.
+
+The 3 seconds then met the demo's 5s `break_duration`, so `satisfy_break`
+refused it with `InsufficientRestError`, the policy turned that into `NoAction`,
+and no break was ever discharged. **Every part of the rest-credit mechanism was
+correct and it produced nothing, because it was fed a bad measurement.** A wrong
+number is harder to see than a wrong branch, and a number that is wrong
+*intermittently* is harder still.
+
+Note what this implies about the detector's contract: it trusts its signal to be
+stable, because a lock genuinely is. Any future lock source must be edge-stable
+for the whole absence, not merely correct on average.
 
 `is_locked()` now asks WTS (`WTSSessionInfoEx` → `SessionFlags`, `0` meaning
 locked) and falls back to `OpenInputDesktop` only when the WTS query itself
-fails. Do not promote the fallback back to primary.
+fails. Do not promote the fallback back to primary — not for simplicity, not to
+drop a DLL dependency.
+
+### Verified end to end on real hardware
+
+```
+[00:25] DEFERRED  focus 10.0s  break_due, break_deferred (session locked)
+[00:42] DEFERRED  focus 27.0s  owed
+[00:43] FOCUSING  focus  0.0s  break_satisfied (session lock)
+```
+
+Credit accumulated during the lock, the owed break survived 17 ticks in
+`DEFERRED`, and unlocking discharged it with focus accumulation resetting to
+zero. Two normal cycles followed immediately.
 
 **`SHQueryUserNotificationState` works, and only for the primary display.**
 

@@ -11,12 +11,12 @@ Break state machine, monotonic and calendar clock abstractions, schedule
 validation, deferral and satisfaction as distinct outcomes, deterministic tests,
 CI.
 
-## P1 — Windows context layer (done)
+## P1 — Windows context layer (complete)
 
 The signals that make an interruption well-timed:
 
 - idle detection (`GetLastInputInfo`)
-- session lock and unlock (`OpenInputDesktop`)
+- session lock and unlock (`WTSQuerySessionInformationW`)
 - fullscreen, presentation mode and Focus Assist (`SHQueryUserNotificationState`)
 - screensaver state (`SPI_GETSCREENSAVERRUNNING`)
 
@@ -31,6 +31,19 @@ break becomes owed. The design and its constraints — consumed once, 30-minute
 staleness window — are specified in
 [architecture.md](architecture.md#rest-taken-before-a-break-is-owed). The domain
 does not change.
+
+**Verified on real hardware**, not only in tests:
+
+- **Lock detection** via `WTSQuerySessionInformationW`. The first implementation
+  used `OpenInputDesktop`, which lagged a real lock by 27 seconds and, worse,
+  oscillated mid-lock; both measurements are in
+  [architecture.md](architecture.md#verified-against-the-real-api).
+- **Rest credit end to end**: locked, accumulated, held across 17 ticks in
+  `DEFERRED`, discharged the owed break on unlock with focus resetting to zero.
+- **Fullscreen detection** via `SHQueryUserNotificationState`: F11 reported
+  `BUSY`, while a maximized window correctly did not.
+- **Known limitation**: fullscreen on a non-primary display is not detected.
+  Carried to P6 below rather than papered over.
 
 Call detection is deliberately deferred. There is no reliable, privacy-respecting
 way to know a user is on a call across every conferencing app, and a detector
