@@ -8,9 +8,12 @@ there are no inline styles anywhere in the UI, and no widget names a colour.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from pathlib import Path
+from importlib import resources
 
-QSS_TEMPLATE = Path(__file__).with_name("style.qss")
+#: Read as package data, not as a path beside __file__: a frozen build has no
+#: source tree, and this is the same route the icon takes.
+QSS_PACKAGE = "ocura.ui"
+QSS_NAME = "style.qss"
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,5 +159,5 @@ DEFAULT_THEME = DARK.name
 
 
 def stylesheet(tokens: Tokens) -> str:
-    template = QSS_TEMPLATE.read_text(encoding="utf-8")
+    template = (resources.files(QSS_PACKAGE) / QSS_NAME).read_text(encoding="utf-8")
     return template.format(**asdict(tokens))

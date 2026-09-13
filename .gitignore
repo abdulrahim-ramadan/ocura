@@ -3,13 +3,17 @@ venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
-build/
-dist/
 .pytest_cache/
 .ruff_cache/
 .coverage
 coverage.xml
 htmlcov/
+
+# Build output, PyInstaller included: trial builds are handed over directly,
+# never committed.
+build/
+dist/
+
 .idea/
 .vscode/
 .claude/settings.local.json

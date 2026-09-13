@@ -164,8 +164,51 @@ class OcuraApp:
         self._app.quit()
 
 
+def self_check() -> int:
+    """Report whether a build can find everything it needs, then exit.
+
+    For a packaged build handed to someone else: `Ocura.exe --self-check > out.txt`
+    answers "is this a bundling problem or a code problem" without a console.
+    """
+    import sys as _sys
+
+    from ocura.ui.resources import APP_ICON, ASSETS
+    from ocura.ui.theme import DARK, QSS_NAME, QSS_PACKAGE, stylesheet
+
+    frozen = getattr(_sys, "frozen", False)
+    lines = [
+        f"frozen: {frozen}",
+        f"bundle: {getattr(_sys, '_MEIPASS', '(not frozen)')}",
+        f"executable: {_sys.executable}",
+        f"prefix: {_sys.prefix}",
+    ]
+    lines += [f"sys.path[{index}]: {entry}" for index, entry in enumerate(_sys.path)]
+    # A packaged build must be self-contained: nothing on the import path may
+    # point back at a source checkout that the recipient will not have.
+    ocura_module = _sys.modules[__name__].__file__ or "(unknown)"
+    lines.append(f"this module loaded from: {ocura_module}")
+
+    app = QApplication([])
+    try:
+        icon = app_icon()
+        lines.append(f"icon {ASSETS}/{APP_ICON}: {'ok' if not icon.isNull() else 'MISSING'}")
+        lines.append(f"icon sizes: {[s.width() for s in icon.availableSizes()]}")
+        qss = stylesheet(DARK)
+        lines.append(f"stylesheet {QSS_PACKAGE}/{QSS_NAME}: {len(qss)} chars")
+        lines.append(f"stylesheet resolved: {'ok' if DARK.accent in qss else 'BROKEN'}")
+    finally:
+        app.quit()
+
+    print("\n".join(lines))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+    arguments = argv if argv is not None else sys.argv
+    if "--self-check" in arguments:
+        return self_check()
 
     # Per-monitor DPI: PassThrough keeps fractional scales such as 150% exact
     # instead of rounding them to whole factors and blurring everything.

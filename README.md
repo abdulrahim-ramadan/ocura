@@ -101,6 +101,12 @@ advance it instantly, so the whole run takes well under a second.
 
 ## Troubleshooting
 
+**Windows warns that the publisher is unknown.** Trial builds are not
+code-signed, so SmartScreen shows "Windows protected your PC" the first time you
+run `Ocura.exe`. Choose **More info**, then **Run anyway**. Signing is a P7
+concern; until then this warning is expected and there is no way to suppress it
+short of buying a certificate.
+
 **The tray icon is missing.** Windows files newly seen tray icons into the
 hidden overflow area — the chevron to the left of the clock — rather than the
 taskbar itself. Ocura is running and the icon is there; drag it out of the
@@ -116,6 +122,27 @@ Domain -> Application -> Infrastructure -> future UI, with dependencies pointing
 inwards only. The domain layer imports no Qt, no `ctypes`, and no Windows API,
 which is what will let the UI and the Windows detectors be added later without
 touching the break logic. See [docs/architecture.md](docs/architecture.md).
+
+## Trial build
+
+```powershell
+.venv\Scripts\pyinstaller.exe packaging\ocura.spec --noconfirm
+```
+
+Produces `dist\Ocura\`, a self-contained folder to hand over as-is. It is
+gitignored and never committed. `--onedir` is deliberate and not a preference:
+PySide6 ships Qt under the LGPL v3, which requires that the recipient be able to
+replace the Qt libraries, and a one-file build unpacks to a temporary directory
+with nothing durable to replace. See `licenses/THIRD_PARTY_NOTICES.md`.
+
+If a build does not start on someone else's machine:
+
+```
+Ocura.exe --self-check > selfcheck.txt
+```
+
+reports whether the bundle resolved its icon and stylesheet, without needing a
+console window.
 
 ## Licensing
 
