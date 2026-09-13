@@ -15,6 +15,7 @@ from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from ocura.application.presenter import SessionView
+from ocura.ui.motion import MOTION
 from ocura.ui.theme import SPACING
 
 #: The shape spans this much of the shorter screen edge at its widest. Sized
@@ -148,6 +149,13 @@ class BreakScreen(QWidget):
         layout.addWidget(self._countdown)
         layout.addLayout(self.actions)
         layout.addStretch(1)
+
+    def begin(self, seconds: float) -> None:
+        """Start the two animations once, for exactly the length of the break."""
+        self.shape.set_scale(1.0)
+        self.blink.set_openness(1.0)
+        MOTION.recede(self.shape, seconds, SHAPE_MIN_SCALE)
+        MOTION.blink(self.blink, seconds)
 
     def render(self, view: SessionView) -> None:
         self._countdown.setText(view.countdown_text)

@@ -61,6 +61,7 @@ class OcuraApp:
         settings: QSettings | None = None,
     ) -> None:
         self._app = app
+        self._schedule = schedule
         self._settings = settings or QSettings(ORGANISATION, APPLICATION)
 
         monotonic = SystemMonotonicClock()
@@ -129,6 +130,7 @@ class OcuraApp:
     def _render_overlay(self, view: SessionView) -> None:
         if view.overlay_visible and not self.overlay.is_open:
             self.overlay.open()
+            self.overlay.begin(self._schedule.break_duration)
         elif not view.overlay_visible and self.overlay.is_open:
             self.overlay.close()
         if self.overlay.is_open:

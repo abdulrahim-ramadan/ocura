@@ -88,6 +88,9 @@ class OverlayWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.screen_content)
 
+    def begin(self, seconds: float) -> None:
+        self.screen_content.begin(seconds)
+
     def render(self, view: SessionView) -> None:
         self.screen_content.render(view)
 
@@ -203,6 +206,11 @@ class OverlayManager(QObject):
     def render(self, view: SessionView) -> None:
         for window in self._windows.values():
             window.render(view)
+
+    def begin(self, seconds: float) -> None:
+        """Run the break animations on every window, once."""
+        for window in self._windows.values():
+            window.begin(seconds)
 
     def _create(self, screen: QScreen) -> None:
         window = self._build()

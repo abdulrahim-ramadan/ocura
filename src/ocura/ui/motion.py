@@ -33,6 +33,13 @@ FILL_MS = 950
 #: Below this the fade reads as a flicker rather than a transition.
 MIN_FADE_FROM = 0.35
 
+#: How many times the eyelid closes across a break. Three is enough to be an
+#: instruction and few enough not to become a rhythm.
+BLINK_COUNT = 3
+
+#: A blink occupies this fraction of the break, centred on each of its moments.
+BLINK_SPAN = 0.08
+
 
 def reduced_motion() -> bool:
     try:
@@ -86,6 +93,49 @@ class Motion:
             FADE_MS,
             QEasingCurve.Type.OutCubic,
         )
+
+    def recede(self, shape: QWidget, seconds: float, to: float) -> None:
+        """Shrink the focus shape once, across the whole break.
+
+        One interpolation with a single loop, not a pulse. It ends when the
+        break ends and the widget is destroyed with the overlay.
+        """
+        if not self.enabled or seconds <= 0:
+            shape.setProperty("scale", to)
+            return
+        self._run(
+            QPropertyAnimation(shape, b"scale", shape),
+            1.0,
+            to,
+            int(seconds * 1000),
+            QEasingCurve.Type.InOutSine,
+        )
+
+    def blink(self, cue: QWidget, seconds: float) -> None:
+        """Three eyelid closes spaced across the break.
+
+        Key frames on one animation rather than a repeating timer or an
+        animation group: three closes are three key frames, and when the single
+        run finishes there is nothing left scheduled.
+        """
+        if not self.enabled or seconds <= 0:
+            cue.setProperty("openness", 1.0)
+            return
+
+        animation = QPropertyAnimation(cue, b"openness", cue)
+        animation.setDuration(int(seconds * 1000))
+        animation.setKeyValueAt(0.0, 1.0)
+        for index in range(BLINK_COUNT):
+            # Spread the closes over the middle of the break so neither the
+            # first nor the last lands exactly on an edge.
+            at = (index + 1) / (BLINK_COUNT + 1)
+            animation.setKeyValueAt(max(0.0, at - BLINK_SPAN), 1.0)
+            animation.setKeyValueAt(at, 0.0)
+            animation.setKeyValueAt(min(1.0, at + BLINK_SPAN), 1.0)
+        animation.setKeyValueAt(1.0, 1.0)
+        animation.setEasingCurve(QEasingCurve.Type.InOutSine)
+        animation.setLoopCount(1)
+        animation.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
     @staticmethod
     def _run(
