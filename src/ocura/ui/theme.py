@@ -14,6 +14,33 @@ QSS_TEMPLATE = Path(__file__).with_name("style.qss")
 
 
 @dataclass(frozen=True, slots=True)
+class Spacing:
+    """One scale, used by the stylesheet and by layout code alike.
+
+    Layout margins live in Python because Qt layouts cannot be reached from QSS,
+    so they read these values rather than carrying numbers of their own.
+    """
+
+    xs: int = 4
+    s: int = 8
+    sm: int = 12
+    m: int = 16
+    lg: int = 24
+    xl: int = 32
+
+
+@dataclass(frozen=True, slots=True)
+class Layout:
+    sidebar_width: int = 200
+    #: Long lines are hard to read and a maximised window is very wide.
+    content_max_width: int = 760
+
+
+SPACING = Spacing()
+LAYOUT = Layout()
+
+
+@dataclass(frozen=True, slots=True)
 class Tokens:
     name: str
 
@@ -30,6 +57,10 @@ class Tokens:
     accent_text: str
     accent_quiet: str
 
+    #: Selection is marked, not shouted: a barely-there tint plus a thin accent
+    #: edge. The loudest thing on screen should never be "which tab am I on".
+    nav_selected: str
+
     font_family: str
     font_size_s: str
     font_size_m: str
@@ -39,8 +70,9 @@ class Tokens:
 
     space_xs: str
     space_s: str
+    space_sm: str
     space_m: str
-    space_l: str
+    space_lg: str
     space_xl: str
 
     radius_s: str
@@ -57,11 +89,12 @@ _SHARED = {
     "font_size_l": "17px",
     "font_size_xl": "22px",
     "font_size_display": "44px",
-    "space_xs": "4px",
-    "space_s": "8px",
-    "space_m": "16px",
-    "space_l": "24px",
-    "space_xl": "36px",
+    "space_xs": f"{SPACING.xs}px",
+    "space_s": f"{SPACING.s}px",
+    "space_sm": f"{SPACING.sm}px",
+    "space_m": f"{SPACING.m}px",
+    "space_lg": f"{SPACING.lg}px",
+    "space_xl": f"{SPACING.xl}px",
     "radius_s": "4px",
     "radius_m": "8px",
     "radius_l": "14px",
@@ -78,7 +111,8 @@ DARK = Tokens(
     text_faint="#6b7681",
     accent="#6ec6b8",
     accent_text="#0f1416",
-    accent_quiet="#2f4f4a",
+    accent_quiet="#243033",
+    nav_selected="#1f2428",
     **_SHARED,
 )
 
@@ -93,7 +127,8 @@ LIGHT = Tokens(
     text_faint="#8a949e",
     accent="#2f6f67",
     accent_text="#ffffff",
-    accent_quiet="#cfe6e1",
+    accent_quiet="#e4ecea",
+    nav_selected="#eaeef1",
     **_SHARED,
 )
 

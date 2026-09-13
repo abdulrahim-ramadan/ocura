@@ -8,11 +8,13 @@ from PySide6.QtWidgets import (
     QListWidget,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from ocura.application.presenter import SessionView
+from ocura.ui.theme import LAYOUT, SPACING
 
 
 def _card(object_name: str = "Card") -> QFrame:
@@ -72,18 +74,18 @@ class DashboardView(QWidget):
     def _build(self) -> None:
         status = _card()
         status_layout = QVBoxLayout(status)
-        status_layout.setContentsMargins(24, 24, 24, 24)
-        status_layout.setSpacing(8)
+        status_layout.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
+        status_layout.setSpacing(SPACING.s)
         status_layout.addWidget(self._headline)
         status_layout.addWidget(self._display)
         status_layout.addWidget(self._detail)
-        status_layout.addSpacing(8)
+        status_layout.addSpacing(SPACING.m)
         status_layout.addWidget(self._progress)
-        status_layout.addSpacing(8)
+        status_layout.addSpacing(SPACING.s)
         status_layout.addWidget(self._waiting)
 
         buttons = QHBoxLayout()
-        buttons.setSpacing(8)
+        buttons.setSpacing(SPACING.s)
         buttons.addWidget(self._start)
         buttons.addWidget(self._pause)
         buttons.addWidget(self._break)
@@ -91,15 +93,15 @@ class DashboardView(QWidget):
 
         metrics = _card()
         metrics_layout = QHBoxLayout(metrics)
-        metrics_layout.setContentsMargins(24, 20, 24, 20)
-        metrics_layout.setSpacing(36)
+        metrics_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
+        metrics_layout.setSpacing(SPACING.xl)
         for widget, caption in (
             (self._breaks_taken, "Breaks taken"),
             (self._rests_credited, "Rests credited"),
             (self._focus_elapsed, "At the screen"),
         ):
             column = QVBoxLayout()
-            column.setSpacing(2)
+            column.setSpacing(SPACING.xs)
             column.addWidget(widget)
             column.addWidget(_label(caption, "MetricLabel"))
             metrics_layout.addLayout(column)
@@ -107,18 +109,37 @@ class DashboardView(QWidget):
 
         events = _card()
         events_layout = QVBoxLayout(events)
-        events_layout.setContentsMargins(24, 20, 24, 20)
-        events_layout.setSpacing(8)
+        events_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
+        events_layout.setSpacing(SPACING.sm)
         events_layout.addWidget(_label("This session", "SectionTitle"))
         events_layout.addWidget(self._events)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(28, 28, 28, 28)
-        root.setSpacing(16)
-        root.addWidget(status)
-        root.addLayout(buttons)
-        root.addWidget(metrics)
-        root.addWidget(events, 1)
+        content = QWidget()
+        content.setObjectName("Content")
+        # A maximised window is very wide and long lines are hard to read. Expanding
+        # rather than Preferred, or the column sits at its size hint and never
+        # reaches the cap.
+        content.setMaximumWidth(LAYOUT.content_max_width)
+        content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+        column = QVBoxLayout(content)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(SPACING.m)
+        column.addWidget(status)
+        column.addLayout(buttons)
+        column.addWidget(metrics)
+        column.addWidget(events, 1)
+
+        # Left-aligned rather than centred: the column stays anchored to the
+        # sidebar instead of floating away from it as the window widens.
+        # The column takes the stretch so it grows to its cap, and a zero-weight
+        # spacer absorbs whatever is left. Without the spacer Qt centres a
+        # size-capped widget in its cell and the column floats away from the
+        # sidebar; with the spacer weighted, the column never reaches the cap.
+        root = QHBoxLayout(self)
+        root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
+        root.addWidget(content, 1)
+        root.addStretch(0)
 
     def render(self, view: SessionView) -> None:
         self._headline.setText(view.headline)
@@ -157,13 +178,24 @@ class PlaceholderView(QWidget):
         super().__init__(parent)
 
         card = _card()
+        card.setMaximumWidth(LAYOUT.content_max_width)
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(24, 24, 24, 24)
-        card_layout.setSpacing(8)
+        card_layout.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
+        card_layout.setSpacing(SPACING.sm)
         card_layout.addWidget(_label(title, "Headline"))
         card_layout.addWidget(_label(promise, "Placeholder"))
 
+        # The card needs a real width before a wrapped label can report the height
+        # it needs, so give it a row of its own rather than an alignment flag.
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(card, 1)
+        row.addStretch(0)
+
+        # An empty section is centred rather than pinned to the top of a void.
         root = QVBoxLayout(self)
-        root.setContentsMargins(28, 28, 28, 28)
-        root.addWidget(card)
+        root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
+        root.addStretch(1)
+        root.addLayout(row)
         root.addStretch(1)

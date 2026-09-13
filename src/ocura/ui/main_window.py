@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ocura.application.presenter import SessionView
+from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import DashboardView, PlaceholderView
 
 DEFAULT_SIZE = QSize(880, 640)
@@ -66,11 +67,11 @@ class MainWindow(QMainWindow):
 
         bar = QWidget()
         bar.setObjectName("Sidebar")
-        bar.setFixedWidth(200)
+        bar.setFixedWidth(LAYOUT.sidebar_width)
 
         layout = QVBoxLayout(bar)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(4)
+        layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, SPACING.sm)
+        layout.setSpacing(SPACING.xs)
         layout.addWidget(_label("Ocura", "Wordmark"))
         layout.addWidget(_label("Better screen habits.", "Tagline"))
 

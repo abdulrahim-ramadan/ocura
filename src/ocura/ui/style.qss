@@ -28,32 +28,37 @@ QLabel {{
 #Wordmark {{
     color: {text};
     font-size: {font_size_l};
-    padding: {space_m} {space_m} {space_xs} {space_m};
+    padding: {space_sm} {space_sm} {space_xs} {space_sm};
 }}
 
 #Tagline {{
     color: {text_faint};
     font-size: {font_size_s};
-    padding: 0 {space_m} {space_l} {space_m};
+    padding: 0 {space_sm} {space_lg} {space_sm};
 }}
 
+/* Selection is a tint and a thin edge. The accent marks the current section; it
+   does not announce it. Both states carry the 2px edge so the label never
+   shifts sideways when it is chosen. */
 #NavButton {{
     background: transparent;
     border: none;
-    border-radius: {radius_m};
+    border-left: 2px solid transparent;
+    border-radius: {radius_s};
     color: {text_muted};
     font-size: {font_size_m};
-    padding: {space_s} {space_m};
+    padding: {space_s} {space_sm};
     text-align: left;
 }}
 
 #NavButton:hover {{
-    background: {surface_raised};
+    background: {nav_selected};
     color: {text};
 }}
 
 #NavButton:checked {{
-    background: {accent_quiet};
+    background: {nav_selected};
+    border-left: 2px solid {accent};
     color: {text};
 }}
 
@@ -96,9 +101,10 @@ QLabel {{
 }}
 
 #WaitingNote {{
-    background: {surface_raised};
-    border: 1px solid {border};
-    border-radius: {radius_m};
+    background: {accent_quiet};
+    border: none;
+    border-left: 2px solid {accent};
+    border-radius: {radius_s};
     color: {text_muted};
     font-size: {font_size_m};
     padding: {space_s} {space_m};
