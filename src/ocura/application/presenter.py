@@ -158,6 +158,13 @@ class BreakPresenter:
         self._absorb([self._session.take_break_now()])
         return self.view()
 
+    def skip_break(self) -> SessionView:
+        """End the break now. A legitimate choice, and reported as nothing more."""
+        if self._session.state is not TimerState.ON_BREAK:
+            return self.view()
+        self._absorb([self._session.skip_break()])
+        return self.view()
+
     def stop(self) -> SessionView:
         if self._running:
             self._absorb([self._session.stop()])

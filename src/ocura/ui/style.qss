@@ -224,3 +224,38 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     border-color: {accent};
     color: {text};
 }}
+
+/* --- break overlay ------------------------------------------------------ */
+
+#Overlay, #BreakScreen {{
+    background: {overlay_bg};
+}}
+
+/* Read back from the palette by the custom paintEvent, so the shape's colour
+   is a token like everything else rather than a literal in Python. */
+#FocusShape {{
+    color: {overlay_shape};
+}}
+
+#BreakMessage {{
+    color: {overlay_text};
+    font-size: {font_size_xl};
+}}
+
+#BreakCountdown {{
+    color: {overlay_text_faint};
+    font-size: {font_size_m};
+}}
+
+#BreakAction {{
+    background: transparent;
+    border: 1px solid {overlay_shape};
+    border-radius: {radius_m};
+    color: {overlay_text_faint};
+    padding: {space_s} {space_m};
+}}
+
+#BreakAction:hover, #BreakAction:focus {{
+    border-color: {overlay_text};
+    color: {overlay_text};
+}}

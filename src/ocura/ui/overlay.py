@@ -27,9 +27,12 @@ import contextlib
 import logging
 from collections.abc import Callable, Iterable
 
-from PySide6.QtCore import QObject, QRect, Qt
-from PySide6.QtGui import QGuiApplication, QScreen
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QObject, QRect, Qt, Signal
+from PySide6.QtGui import QGuiApplication, QKeyEvent, QScreen
+from PySide6.QtWidgets import QVBoxLayout, QWidget
+
+from ocura.application.presenter import SessionView
+from ocura.ui.break_screen import BreakScreen
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +68,10 @@ def overlay_geometry(screen: QScreen) -> QRect:
 
 
 class OverlayWindow(QWidget):
-    """A bare full-screen surface. Content arrives in a later step."""
+    """One screen's worth of break overlay."""
+
+    skipRequested = Signal()
+    snoozeRequested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent, OVERLAY_FLAGS)
@@ -75,6 +81,23 @@ class OverlayWindow(QWidget):
         # makes several of them fight over the shell and can leave one screen
         # uncovered.
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        self.setAutoFillBackground(True)
+
+        self.screen_content = BreakScreen(self)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.screen_content)
+
+    def render(self, view: SessionView) -> None:
+        self.screen_content.render(view)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Esc ends the break. The overlay covers the screen; it does not trap."""
+        if event.key() == Qt.Key.Key_Escape:
+            self.skipRequested.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def place_on(self, screen: QScreen) -> None:
         """Bind to a screen before showing, so DPI is right from the first frame."""
@@ -89,6 +112,9 @@ class OverlayWindow(QWidget):
 
 class OverlayManager(QObject):
     """Keeps exactly one overlay window on every screen, for as long as it is open."""
+
+    skipRequested = Signal()
+    snoozeRequested = Signal()
 
     def __init__(
         self,
@@ -174,13 +200,23 @@ class OverlayManager(QObject):
 
     # --- window lifetime ----------------------------------------------------
 
+    def render(self, view: SessionView) -> None:
+        for window in self._windows.values():
+            window.render(view)
+
     def _create(self, screen: QScreen) -> None:
         window = self._build()
+        window.skipRequested.connect(self.skipRequested)
+        window.snoozeRequested.connect(self.snoozeRequested)
         self._windows[screen] = window
         screen.geometryChanged.connect(self._on_screens_changed)
         window.place_on(screen)
         window.show()
         window.raise_()
+        # Only the first window takes focus, so Esc has somewhere to land
+        # without the windows fighting each other for activation.
+        if len(self._windows) == 1:
+            window.activateWindow()
         logger.info("overlay opened on %s %s", screen.name(), overlay_geometry(screen))
 
     def _discard(self, screen: QScreen) -> None:

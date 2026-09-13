@@ -63,6 +63,15 @@ class Tokens:
     #: edge. The loudest thing on screen should never be "which tab am I on".
     nav_selected: str
 
+    #: The break overlay is warm and dark in BOTH themes. A break screen exists
+    #: to rest the eye, and a bright white one at the end of a focus block is
+    #: the opposite of that — so this is the one surface the light theme does
+    #: not lighten.
+    overlay_bg: str
+    overlay_shape: str
+    overlay_text: str
+    overlay_text_faint: str
+
     font_family: str
     font_size_s: str
     font_size_m: str
@@ -115,6 +124,10 @@ DARK = Tokens(
     accent_text="#0f1416",
     accent_quiet="#243033",
     nav_selected="#1f2428",
+    overlay_bg="#141110",
+    overlay_shape="#241f1c",
+    overlay_text="#8f8681",
+    overlay_text_faint="#5f5854",
     **_SHARED,
 )
 
@@ -131,6 +144,10 @@ LIGHT = Tokens(
     accent_text="#ffffff",
     accent_quiet="#e4ecea",
     nav_selected="#eaeef1",
+    overlay_bg="#141110",
+    overlay_shape="#241f1c",
+    overlay_text="#8f8681",
+    overlay_text_faint="#5f5854",
     **_SHARED,
 )
 

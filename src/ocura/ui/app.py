@@ -15,6 +15,7 @@ from ocura.ui import motion
 from ocura.ui.driver import TickDriver
 from ocura.ui.main_window import MainWindow
 from ocura.ui.motion import Motion
+from ocura.ui.overlay import OverlayManager
 from ocura.ui.resources import app_icon
 from ocura.ui.single_instance import SingleInstance
 from ocura.ui.theme import DARK, DEFAULT_THEME, LIGHT, THEMES, stylesheet
@@ -74,6 +75,7 @@ class OcuraApp:
         self.window = MainWindow(icon, self._settings)
         self.tray = Tray(icon, app)
         self.toast = BreakToast()
+        self.overlay = OverlayManager()
 
         app.setWindowIcon(icon)
         # Closing the last window must not end the process: the tray is the app.
@@ -99,6 +101,8 @@ class OcuraApp:
 
         self.toast.snoozeRequested.connect(self._on_toast_snooze)
 
+        self.overlay.skipRequested.connect(self.driver.skip_break)
+
     # --- theme --------------------------------------------------------------
 
     @property
@@ -120,6 +124,15 @@ class OcuraApp:
         self.window.render(view)
         self.tray.render(view, self.driver.presenter.tooltip())
         self._render_toast(view)
+        self._render_overlay(view)
+
+    def _render_overlay(self, view: SessionView) -> None:
+        if view.overlay_visible and not self.overlay.is_open:
+            self.overlay.open()
+        elif not view.overlay_visible and self.overlay.is_open:
+            self.overlay.close()
+        if self.overlay.is_open:
+            self.overlay.render(view)
 
     def _render_toast(self, view: SessionView) -> None:
         if view.warning_visible:
@@ -141,6 +154,7 @@ class OcuraApp:
 
     def quit(self) -> None:
         self.driver.stop()
+        self.overlay.close()
         self.toast.hide()
         self.tray.hide()
         self._app.quit()
