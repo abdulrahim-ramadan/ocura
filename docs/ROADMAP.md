@@ -70,6 +70,16 @@ Overlay across all monitors, countdown, skip, snooze, notifications. Snooze is
 capped at two — beyond that the reminder has stopped being a reminder, and
 nagging is not a feature.
 
+**The guided blink cue and the receding focus shape live here, not on the
+dashboard.** Both were considered for the P2 dashboard and rejected: peripheral
+motion pulls the eye involuntarily, so a permanently animating element on a
+glance surface interrupts the user without asking, which is what the product
+exists to prevent. On the break screen the same motion is purposeful and bounded
+to the twenty seconds of the break — the user has already agreed to look away,
+and the animation is the instruction rather than decoration. Recorded so it is
+not relitigated as a dashboard feature. See the motion policy in
+[architecture.md](architecture.md#motion-policy).
+
 ## P4 — Persistence
 
 SQLite: sessions, settings, daily metrics.

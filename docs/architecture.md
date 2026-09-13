@@ -435,6 +435,71 @@ greps the package to keep it that way, so P6 can restyle by editing token values
 rather than hunting through widgets. Dark and light are the same template with
 different token values.
 
+Layout margins live in Python because Qt layouts cannot be reached from QSS, but
+they read the same `Spacing` scale, and `test_no_widget_module_hardcodes_spacing`
+fails the build on a literal in `setContentsMargins`, `setSpacing`, `addSpacing`,
+`setFixedWidth` or `setMaximumWidth`.
+
+### Assets
+
+Icons are package data under `ocura/ui/assets/`, read through
+`importlib.resources` as bytes rather than as a path relative to the source
+tree. A path built from `__file__` and `parents[n]` resolves only while there is
+a repository around the code, which stops being true the moment P7 packages it.
+`scripts/make_icon.py` regenerates a plain fallback used only if the real icon
+is missing.
+
+### Theme choice, and where it lives for now
+
+The dark/light choice is stored in `QSettings` under `shell/theme`, alongside
+window geometry. Both are shell state rather than user settings, and the theme
+control lives in the sidebar footer rather than in Settings, which is P5 and
+stays honestly empty until it has something real to write into.
+
+**P5 moves the theme into the real settings model** and the sidebar control
+becomes a shortcut to it. The `shell/` namespace exists so that migration is a
+move rather than an excavation.
+
+On first run, with nothing stored, Ocura follows the system colour scheme via
+`QStyleHints.colorScheme()` and falls back to dark when Qt reports `Unknown`.
+
+## Motion policy
+
+The dashboard is a two-second glance surface and must be still.
+
+Peripheral motion pulls the eye involuntarily. An eye-care application that
+animates continuously is interrupting the user without permission — the exact
+behaviour the entire product exists to avoid — so a permanently moving element
+on the dashboard is not a decoration to be tuned, it is a contradiction. An
+animated blinking eye was considered for the dashboard and **rejected on this
+ground**, not on grounds of effort or taste.
+
+What is allowed, and nothing else:
+
+- the countdown fill glides to its new value rather than stepping once a second
+- page transitions cross-fade over 200ms
+- a state change fades rather than snaps
+
+Every one of those is triggered by a change and runs exactly once. Nothing
+loops, nothing pulses, nothing moves while the state is unchanged. The countdown
+fill is the only continuous-*looking* animation and it is not a loop: each tick
+starts a single interpolation that happens to arrive as the next begins.
+
+All animation is skipped when Windows reports reduced motion
+(`SPI_GETCLIENTAREAANIMATION`, read in the infrastructure layer since it is a
+platform call). A failed read leaves motion on: motion is the normal case, and
+an unreadable setting is not consent either way.
+
+Animations are created in `ocura/ui/motion.py` and nowhere else, which
+`tests/unit/test_motion_policy.py` enforces by parsing the package: only
+`driver.py` may own a repeating timer, `setLoopCount` must be exactly 1,
+`QMovie` and `QTimeLine` are banned outright, and the dashboard's fade must stay
+guarded by a state comparison.
+
+Purposeful motion belongs in the P3 break screen, where it is bounded to the
+length of a break and is the point of the screen rather than a background
+texture.
+
 ## Known limitation: fullscreen on a non-primary display
 
 `SHQueryUserNotificationState` watches the primary display only. Measured on a
