@@ -26,6 +26,8 @@ class SessionEventKind(StrEnum):
     BREAK_STARTED_BY_USER = "break_started_by_user"
     BREAK_COMPLETED = "break_completed"
     BREAK_DEFERRED = "break_deferred"
+    #: Postponed by the user, not by a detector. P4 will want to tell them apart.
+    BREAK_SNOOZED = "break_snoozed"
     BREAK_SATISFIED = "break_satisfied"
     PAUSED = "paused"
     RESUMED = "resumed"
@@ -62,6 +64,14 @@ class BreakSession:
     def state(self) -> TimerState:
         return self._timer.state
 
+    @property
+    def can_snooze(self) -> bool:
+        return self._timer.can_snooze
+
+    @property
+    def snoozes_used(self) -> int:
+        return self._timer.snoozes_used
+
     def snapshot(self) -> TimerSnapshot:
         return self._timer.snapshot()
 
@@ -85,6 +95,11 @@ class BreakSession:
         """The user asked for a break, whether or not one was owed."""
         self._timer.take_break_now()
         return self._event(SessionEventKind.BREAK_STARTED_BY_USER)
+
+    def snooze(self) -> SessionEvent:
+        """The user postpones the break. The cap is enforced in the domain."""
+        self._timer.snooze()
+        return self._event(SessionEventKind.BREAK_SNOOZED)
 
     def skip_break(self) -> SessionEvent:
         """End the break now. Ocura does not force breaks, so this is not a failure."""

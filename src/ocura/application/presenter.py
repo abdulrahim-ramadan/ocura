@@ -87,6 +87,11 @@ class SessionView:
     breaks_taken: int
     rests_credited: int
 
+    #: False once the cap is reached, so a view can drop the control rather than
+    #: offer an action that would be refused.
+    can_snooze: bool
+    snoozes_used: int
+
     events: tuple[EventLine, ...] = field(default_factory=tuple)
 
     #: False when no session is running, so a view can disable the control
@@ -158,6 +163,12 @@ class BreakPresenter:
         self._absorb([self._session.take_break_now()])
         return self.view()
 
+    def snooze(self) -> SessionView:
+        if not self.view().can_snooze:
+            return self.view()
+        self._absorb([self._session.snooze()])
+        return self.view()
+
     def skip_break(self) -> SessionView:
         """End the break now. A legitimate choice, and reported as nothing more."""
         if self._session.state is not TimerState.ON_BREAK:
@@ -206,6 +217,8 @@ class BreakPresenter:
             overlay_visible=state is TimerState.ON_BREAK,
             breaks_taken=self._breaks_taken,
             rests_credited=self._rests_credited,
+            can_snooze=self._running and self._session.can_snooze,
+            snoozes_used=self._session.snoozes_used,
             events=tuple(self._events),
             can_take_break_now=self._running and state in _USER_MAY_ASK,
         )
@@ -251,6 +264,8 @@ class BreakPresenter:
             match event.kind:
                 case SessionEventKind.BREAK_DEFERRED:
                     self._waiting_reason = event.detail or None
+                case SessionEventKind.BREAK_SNOOZED:
+                    self._waiting_reason = "postponed"
                 case SessionEventKind.BREAK_COMPLETED:
                     self._breaks_taken += 1
                     self._waiting_reason = None
@@ -280,6 +295,8 @@ class BreakPresenter:
                 return "Break finished"
             case SessionEventKind.BREAK_DEFERRED:
                 return f"Waiting — {event.detail}" if event.detail else "Waiting for a good moment"
+            case SessionEventKind.BREAK_SNOOZED:
+                return "Break postponed"
             case SessionEventKind.BREAK_SATISFIED:
                 return f"Rest credited — {event.detail}" if event.detail else "Rest credited"
             case SessionEventKind.PAUSED:

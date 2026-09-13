@@ -45,6 +45,9 @@ class TickDriver(QObject):
     def skip_break(self) -> None:
         self._emit(self._presenter.skip_break())
 
+    def snooze(self) -> None:
+        self._emit(self._presenter.snooze())
+
     def refresh(self) -> None:
         self._emit(self._presenter.view())
 

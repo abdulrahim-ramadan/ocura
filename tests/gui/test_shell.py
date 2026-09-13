@@ -37,6 +37,8 @@ def a_view(**overrides) -> SessionView:
         overlay_visible=False,
         breaks_taken=2,
         rests_credited=1,
+        can_snooze=True,
+        snoozes_used=0,
         events=(),
         can_take_break_now=True,
     )

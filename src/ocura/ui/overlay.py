@@ -84,6 +84,8 @@ class OverlayWindow(QWidget):
         self.setAutoFillBackground(True)
 
         self.screen_content = BreakScreen(self)
+        self.screen_content.skipRequested.connect(self.skipRequested)
+        self.screen_content.snoozeRequested.connect(self.snoozeRequested)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.screen_content)

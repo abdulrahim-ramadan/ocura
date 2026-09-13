@@ -10,9 +10,16 @@ seconds; the digits are there for anyone who wants them, small and quiet.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Property, QSize, Qt
+from PySide6.QtCore import Property, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPalette
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ocura.application.presenter import SessionView
 from ocura.ui.motion import MOTION
@@ -116,6 +123,9 @@ class BlinkCue(QWidget):
 class BreakScreen(QWidget):
     """The content of one overlay window. Renders a SessionView, decides nothing."""
 
+    skipRequested = Signal()
+    snoozeRequested = Signal()
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("BreakScreen")
@@ -132,9 +142,21 @@ class BreakScreen(QWidget):
         self._countdown.setObjectName("BreakCountdown")
         self._countdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # Skip says what it does and nothing about what it means. Ending a break
+        # early is a legitimate choice and the screen has no opinion about it.
+        self._skip = QPushButton("Skip")
+        self._skip.setObjectName("BreakAction")
+        self._skip.clicked.connect(self.skipRequested)
+
+        self._snooze = QPushButton("Later")
+        self._snooze.setObjectName("BreakAction")
+        self._snooze.clicked.connect(self.snoozeRequested)
+
         self.actions = QHBoxLayout()
         self.actions.setSpacing(SPACING.sm)
         self.actions.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.actions.addWidget(self._snooze)
+        self.actions.addWidget(self._skip)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACING.xl, SPACING.xl, SPACING.xl, SPACING.xl)
@@ -159,3 +181,6 @@ class BreakScreen(QWidget):
 
     def render(self, view: SessionView) -> None:
         self._countdown.setText(view.countdown_text)
+        # Past the cap the control goes away rather than sitting there disabled:
+        # a greyed button invites a second look at something already decided.
+        self._snooze.setVisible(view.can_snooze)

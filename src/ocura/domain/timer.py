@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from ocura.domain.clock import MonotonicClock
-from ocura.domain.errors import ConfigurationError, InsufficientRestError, TransitionError
+from ocura.domain.errors import (
+    ConfigurationError,
+    InsufficientRestError,
+    SnoozeLimitReached,
+    TransitionError,
+)
 from ocura.domain.schedule import BreakSchedule
 
 
@@ -33,6 +38,15 @@ _FOCUS_ACCRUING = frozenset({TimerState.FOCUSING, TimerState.PRE_BREAK, *_BREAK_
 #: separate from _FOCUS_ACCRUING despite matching it today: one is about counting
 #: time, this is about who is allowed to ask.
 _USER_MAY_TAKE_BREAK = frozenset({TimerState.FOCUSING, TimerState.PRE_BREAK, *_BREAK_OWED})
+
+#: A break may be postponed twice in a row. Beyond that it is offered again
+#: without the option — never forced, just not postponable a third time. Nagging
+#: is not a feature and neither is a break the user cannot get away from.
+MAX_SNOOZES = 2
+
+#: Snoozing is a user's answer to "shall we do this now", so it is available
+#: from the warning, from the offer, and from the break itself.
+_USER_MAY_SNOOZE = frozenset({TimerState.PRE_BREAK, TimerState.BREAK_DUE, TimerState.ON_BREAK})
 
 
 class _Stopwatch:
@@ -89,6 +103,7 @@ class BreakTimer:
         self._state = TimerState.IDLE
         self._resume_state: TimerState | None = None
         self._retry_after: float | None = None
+        self._snoozes = 0
         self._focus = _Stopwatch()
         self._break = _Stopwatch()
         self._deferral = _Stopwatch()
@@ -100,6 +115,15 @@ class BreakTimer:
     @property
     def state(self) -> TimerState:
         return self._state
+
+    @property
+    def snoozes_used(self) -> int:
+        """Consecutive snoozes. Reset by a break actually happening."""
+        return self._snoozes
+
+    @property
+    def can_snooze(self) -> bool:
+        return self._state in _USER_MAY_SNOOZE and self._snoozes < MAX_SNOOZES
 
     # --- commands ---------------------------------------------------------
 
@@ -113,6 +137,7 @@ class BreakTimer:
         now = self._clock.monotonic()
         self._resume_state = None
         self._retry_after = None
+        self._snoozes = 0
         self._reset_all()
         self._enter(TimerState.IDLE, now)
 
@@ -159,6 +184,27 @@ class BreakTimer:
             )
         now = self._clock.monotonic()
         self._retry_after = retry_after
+        self._deferral.reset()
+        self._enter(TimerState.DEFERRED, now)
+
+    def snooze(self) -> None:
+        """The user postpones the break. Capped, and the cap lives here.
+
+        Unlike defer(), which is the environment saying now is a bad moment,
+        this is the user saying so. Both land in DEFERRED — an owed break with a
+        deadline — because that is what a postponed break is, whoever asked.
+        """
+        if self._state not in _USER_MAY_SNOOZE:
+            raise TransitionError(f"cannot snooze from {self._state}")
+        if self._snoozes >= MAX_SNOOZES:
+            raise SnoozeLimitReached(
+                f"already postponed {self._snoozes} times in a row; "
+                "the break is offered again without the option"
+            )
+
+        now = self._clock.monotonic()
+        self._snoozes += 1
+        self._retry_after = self._schedule.snooze_interval
         self._deferral.reset()
         self._enter(TimerState.DEFERRED, now)
 
@@ -244,6 +290,9 @@ class BreakTimer:
         return self._retry_after
 
     def _start_focus_block(self, now: float) -> None:
+        # A break that actually happened clears the run of snoozes: the cap is on
+        # consecutive postponements, not on a whole day of them.
+        self._snoozes = 0
         self._reset_all()
         self._enter(TimerState.FOCUSING, now)
 

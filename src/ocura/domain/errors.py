@@ -19,3 +19,12 @@ class InsufficientRestError(OcuraError):
     Distinct from TransitionError: the transition itself is legal, the evidence
     behind it is not.
     """
+
+
+class SnoozeLimitReached(OcuraError):
+    """The break has been postponed as often as it can be.
+
+    Distinct from TransitionError: the state allows a snooze, the allowance is
+    spent. The break is still not forced — it is offered again without the
+    option to postpone it a third time.
+    """

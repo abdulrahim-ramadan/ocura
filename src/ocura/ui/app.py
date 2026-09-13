@@ -103,6 +103,7 @@ class OcuraApp:
         self.toast.snoozeRequested.connect(self._on_toast_snooze)
 
         self.overlay.skipRequested.connect(self.driver.skip_break)
+        self.overlay.snoozeRequested.connect(self.driver.snooze)
 
     # --- theme --------------------------------------------------------------
 
@@ -138,7 +139,7 @@ class OcuraApp:
 
     def _render_toast(self, view: SessionView) -> None:
         if view.warning_visible:
-            self.toast.render(f"A break in {view.countdown_text}", can_snooze=True)
+            self.toast.render(f"A break in {view.countdown_text}", can_snooze=view.can_snooze)
             if not self.toast.isVisible():
                 self.toast.show_near_tray()
         elif self.toast.isVisible():
@@ -146,6 +147,7 @@ class OcuraApp:
 
     def _on_toast_snooze(self) -> None:
         self.toast.hide()
+        self.driver.snooze()
 
     def start(self) -> None:
         # Before the window: the tray is how Ocura is reached once the window is
