@@ -64,11 +64,12 @@ tokens carries both themes so P6 can restyle without touching a widget.
 Statistics and Settings are navigable and honestly empty — they say what is
 coming and when, rather than showing invented data.
 
-## P3 — Break experience
+## P3 — Break experience (complete)
 
-Overlay across all monitors, countdown, skip, snooze, notifications. Snooze is
-capped at two — beyond that the reminder has stopped being a reminder, and
-nagging is not a feature.
+Overlay across all monitors, countdown, skip, snooze, and a pre-break warning.
+Snooze is capped at two — beyond that the reminder has stopped being a reminder,
+and nagging is not a feature. The design and its guarantees are in
+[architecture.md](architecture.md#the-break-experience).
 
 **Ocura draws its own pre-break toast; it does not use OS notifications.**
 Measured on the development machine, `QSystemTrayIcon.supportsMessages()`

@@ -32,15 +32,15 @@ screen, display state — are platform-specific by nature.
 telemetry, no analytics. Nothing leaves the machine. When persistence arrives in
 P4, the schema will carry no user identifier of any kind.
 
-## Current status: P2, application shell
+## Current status: P3, the break experience
 
 P0 built the framework-free core, P1 the Windows detectors that decide when
 interrupting is appropriate, and P2 the first user-visible surface: a tray icon
 and a window showing live session state.
 
-Ocura runs. There is no break overlay yet — a break currently happens on the
-dashboard and in the tray tooltip, not across your screen — and nothing is
-saved to disk, so Statistics and Settings are navigable but empty.
+Ocura runs and does its job: it warns before a break, dims every screen for the
+break itself, and lets you skip or postpone it. Nothing is saved to disk yet, so
+Statistics and Settings are navigable but empty.
 
 | Area | Status |
 | --- | --- |
@@ -55,7 +55,8 @@ saved to disk, so Statistics and Settings are navigable but empty.
 | Tray icon, main window, navigation | Implemented |
 | Live dashboard, in-memory session log | Implemented |
 | Dark and light themes from one token set | Implemented |
-| Break overlay, countdown, notifications, snooze | Planned, P3 |
+| Pre-break warning, break overlay on every screen | Implemented |
+| Skip, and snooze capped at two | Implemented |
 | Persistence, settings, daily metrics | Planned, P4 |
 | Onboarding | Planned, P5 |
 | Installer and packaging | Planned, P7 |

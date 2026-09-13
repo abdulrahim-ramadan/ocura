@@ -500,6 +500,82 @@ Purposeful motion belongs in the P3 break screen, where it is bounded to the
 length of a break and is the point of the screen rather than a background
 texture.
 
+## The break experience
+
+### Two windows with opposite focus rules
+
+The **toast** must never take keyboard focus. It appears while the user is
+mid-sentence by definition — that is what a warning is — so a stolen keystroke
+there is the worst failure in the milestone. Three things enforce it, because
+any one alone is easy to undo by accident: `Qt::WindowDoesNotAcceptFocus`,
+`WA_ShowWithoutActivating`, and `Qt::Tool`. Its buttons are `NoFocus` and
+reachable by mouse only, since a focusable button means a focusable window.
+`test_showing_the_toast_does_not_steal_the_keystroke` types half a sentence,
+raises the toast, and finishes the sentence.
+
+The **overlay** does take focus, deliberately. Esc has to reach it, and an
+unavoidable full-screen window that cannot be dismissed from the keyboard is a
+worse outcome than a taken focus. The guarantee about keystrokes therefore sits
+entirely on the toast: the warning is what gives the user time to finish before
+the screen is covered.
+
+### Cover, do not capture
+
+The overlay sets no keyboard hook, holds no grab, runs no timer re-asserting
+z-order, and never takes the fullscreen *window state* — which is exclusive on
+Windows and makes several windows fight over the shell. Ctrl+Alt+Del, the lock
+screen and the task switcher behave exactly as they would if Ocura were not
+running, because the secure desktop is a separate desktop and nothing here
+tries to follow it there. Skip is always visible; the snooze control is the
+only one that can disappear.
+
+### Screens
+
+One window per screen at `screen.geometry()` — the full rectangle, taskbar
+included, since a break screen that leaves the taskbar showing has a bright
+strip along one edge. Every screen event runs the same idempotent `_sync()`,
+which diffs windows against screens; `plan()` is its pure core and is tested
+with plain strings. Losing every display is survivable: zero windows, a logged
+warning, and the manager stays open, because the break is timed by the engine
+rather than by a window.
+
+Content is sized against `min(width, height)`, so the portrait monitor gets a
+circle rather than a landscape composition stretched sideways, and the leftover
+vertical space is left empty. Empty space on a break screen is the point.
+
+**Pending hardware confirmation.** Reconciliation is verified by *simulating*
+the screen list — a monitor cannot be unplugged from a test. Qt's real
+`screenRemoved` timing on a physical disconnect mid-break has not yet been
+observed, and the handler drops the window explicitly before reconciling
+precisely because that timing is not guaranteed. To be confirmed or corrected
+against hardware.
+
+### Motion, bounded to the break
+
+Two animations, each started once when the overlay opens and each lasting
+exactly the break: the focus shape recedes from 1.0 to 0.35, and an eyelid line
+closes three times. The blinks are key frames on a *single* animation rather
+than a repeating timer or an animation group, so when the run finishes nothing
+is left scheduled. Both are skipped under reduced motion, leaving a still screen
+with the number.
+
+This is the exception the motion policy allows, and it is bounded by the break's
+own length. An animated element on the *dashboard* remains ruled out for the
+reasons in that policy.
+
+### Snooze, and where the cap lives
+
+`MAX_SNOOZES = 2`, in the domain, enforced by `BreakTimer.snooze()` raising
+`SnoozeLimitReached` past the cap. Snoozing is available from the warning, the
+offer and the break itself — all three are moments where the user is being asked
+"now?" — and lands in `DEFERRED`, because a postponed break is an owed break
+with a deadline whoever asked for it.
+
+Past the cap the break is offered again **without** the option, which is not the
+same as forcing it: the user can still skip, and skipping says nothing about
+having skipped. The count is consecutive: a break actually taken resets it, so
+the cap limits a run of postponements rather than a day of them.
+
 ## Known limitation: fullscreen on a non-primary display
 
 `SHQueryUserNotificationState` watches the primary display only. Measured on a
