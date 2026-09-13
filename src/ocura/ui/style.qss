@@ -1,0 +1,189 @@
+/* Built from ocura.ui.theme.Tokens. Every value here is a token placeholder;
+   if you find yourself typing a literal colour or pixel size, add a token. */
+
+QWidget {{
+    background: {bg};
+    color: {text};
+    font-family: {font_family};
+    font-size: {font_size_m};
+}}
+
+QMainWindow, #Root {{
+    background: {bg};
+}}
+
+/* Labels inherit QWidget's background and would otherwise paint a page-coloured
+   box over whatever surface they sit on. */
+QLabel {{
+    background: transparent;
+}}
+
+/* --- navigation ------------------------------------------------------- */
+
+#Sidebar {{
+    background: {surface};
+    border-right: 1px solid {border};
+}}
+
+#Wordmark {{
+    color: {text};
+    font-size: {font_size_l};
+    padding: {space_m} {space_m} {space_xs} {space_m};
+}}
+
+#Tagline {{
+    color: {text_faint};
+    font-size: {font_size_s};
+    padding: 0 {space_m} {space_l} {space_m};
+}}
+
+#NavButton {{
+    background: transparent;
+    border: none;
+    border-radius: {radius_m};
+    color: {text_muted};
+    font-size: {font_size_m};
+    padding: {space_s} {space_m};
+    text-align: left;
+}}
+
+#NavButton:hover {{
+    background: {surface_raised};
+    color: {text};
+}}
+
+#NavButton:checked {{
+    background: {accent_quiet};
+    color: {text};
+}}
+
+/* --- cards ------------------------------------------------------------ */
+
+#Card {{
+    background: {surface};
+    border: 1px solid {border};
+    border-radius: {radius_l};
+}}
+
+#Headline {{
+    color: {text};
+    font-size: {font_size_xl};
+}}
+
+#Display {{
+    color: {text};
+    font-size: {font_size_display};
+}}
+
+#Detail {{
+    color: {text_muted};
+    font-size: {font_size_m};
+}}
+
+#SectionTitle {{
+    color: {text_faint};
+    font-size: {font_size_s};
+}}
+
+#Metric {{
+    color: {text};
+    font-size: {font_size_xl};
+}}
+
+#MetricLabel {{
+    color: {text_faint};
+    font-size: {font_size_s};
+}}
+
+#WaitingNote {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    border-radius: {radius_m};
+    color: {text_muted};
+    font-size: {font_size_m};
+    padding: {space_s} {space_m};
+}}
+
+#Placeholder {{
+    color: {text_muted};
+    font-size: {font_size_m};
+}}
+
+/* --- controls --------------------------------------------------------- */
+
+QPushButton {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    border-radius: {radius_m};
+    color: {text};
+    padding: {space_s} {space_m};
+}}
+
+QPushButton:hover {{
+    border-color: {accent};
+}}
+
+QPushButton:disabled {{
+    color: {text_faint};
+    border-color: {border};
+}}
+
+QPushButton#Primary {{
+    background: {accent};
+    border: 1px solid {accent};
+    color: {accent_text};
+}}
+
+QPushButton#Primary:disabled {{
+    background: {accent_quiet};
+    border-color: {accent_quiet};
+    color: {text_faint};
+}}
+
+QProgressBar {{
+    background: {surface_raised};
+    border: none;
+    border-radius: {radius_s};
+    max-height: 6px;
+    min-height: 6px;
+    text-align: center;
+}}
+
+QProgressBar::chunk {{
+    background: {accent};
+    border-radius: {radius_s};
+}}
+
+/* --- event list ------------------------------------------------------- */
+
+#EventList {{
+    background: transparent;
+    border: none;
+    color: {text_muted};
+    font-size: {font_size_s};
+}}
+
+#EventList::item {{
+    padding: {space_xs} 0;
+}}
+
+#EventList::item:selected {{
+    background: transparent;
+    color: {text};
+}}
+
+QScrollBar:vertical {{
+    background: transparent;
+    border: none;
+    width: 8px;
+}}
+
+QScrollBar::handle:vertical {{
+    background: {border};
+    border-radius: {radius_s};
+    min-height: 24px;
+}}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0;
+}}

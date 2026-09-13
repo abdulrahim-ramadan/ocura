@@ -1,0 +1,14 @@
+# Applies to src/ocura/ui/ only. This is the one layer allowed to import a UI
+# toolkit; everything below it is still forbidden to. The platform and storage
+# bans stay in force here — Windows access belongs in infrastructure and
+# persistence arrives in P4, neither of them in a widget.
+#
+# This table REPLACES the one in pyproject.toml rather than merging with it, so
+# the PySide6 ban is dropped by omission and the rest must be restated.
+extend = "../../../pyproject.toml"
+
+[lint.flake8-tidy-imports.banned-api]
+"ctypes".msg = "Platform access belongs in ocura.infrastructure."
+"sqlite3".msg = "Persistence belongs in ocura.infrastructure (P4)."
+"ocura.domain.timer.BreakTimer".msg = "Widgets read a SessionView. Go through BreakPresenter."
+"ocura.domain.policy".msg = "Widgets read a SessionView. Go through BreakPresenter."
