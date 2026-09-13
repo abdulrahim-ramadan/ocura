@@ -307,6 +307,68 @@ cancel. Do not "simplify" this by dropping the masks; nothing in the test suite
 or in a short manual run will notice, and the bug reappears after seven weeks of
 uptime.
 
+**`OpenInputDesktop` does not detect a lock. It detects the secure desktop.**
+
+The first `is_locked()` opened the input desktop and treated failure as a lock.
+That is the widely repeated recipe and it is wrong: the handle does not start
+failing when the session locks, it starts failing once the secure desktop
+actually *becomes* the input desktop, which typically waits for the display to
+sleep. Measured against `WTSQuerySessionInformationW` across one real lock:
+
+```
+00:38  WTS SessionFlags -> 0 (LOCKED)      OpenInputDesktop -> still a handle
+01:05  WTS SessionFlags -> 0 (LOCKED)      OpenInputDesktop -> NULL (27s late)
+01:08  WTS SessionFlags -> 1 (unlocked)    OpenInputDesktop -> handle
+```
+
+A 30-second absence was therefore measured as 3 seconds. The consequence was
+silent and instructive: 3s is shorter than the demo's 5s `break_duration`, so
+`satisfy_break` refused the credit with `InsufficientRestError`, the policy
+turned that into `NoAction`, and no break was ever discharged. **Every part of
+the rest-credit mechanism was correct and it produced nothing, because it was
+being fed a bad measurement.** A wrong number is harder to see than a wrong
+branch.
+
+`is_locked()` now asks WTS (`WTSSessionInfoEx` → `SessionFlags`, `0` meaning
+locked) and falls back to `OpenInputDesktop` only when the WTS query itself
+fails. Do not promote the fallback back to primary.
+
+**`SHQueryUserNotificationState` works, and only for the primary display.**
+
+Confirmed working: F11 in a browser moved it to `2 BUSY(fullscreen)`, and a
+maximized Brave window at `(-8, -8, 2568, 1448)` against a monitor of
+`(0, 0, 2560, 1440)` — `covers=True` by rectangle — correctly stayed at
+`5 ACCEPTS_NOTIFICATIONS`. The maximized-window fix is independently
+reconfirmed on a second app and a second monitor.
+
+Its limitation is recorded in the next section.
+
+## Known limitation: fullscreen on a non-primary display
+
+`SHQueryUserNotificationState` watches the primary display only. Measured on a
+two-monitor setup — primary `(0, 0, 2560, 1440)`, portrait secondary
+`(-1080, 0, 0, 1920)` — a window covering the *secondary* monitor exactly:
+
+```
+01:18  foreground win=(-1080, 0, 0, 1920)  mon=(-1080, 0, 0, 1920)
+       primary=False  covers=True  exact=True
+       notification state: 5 ACCEPTS_NOTIFICATIONS
+```
+
+So a fullscreen video or presentation on a secondary monitor is **not**
+detected, and Ocura will offer a break through it.
+
+Do not fix this by falling back to comparing window and monitor rectangles when
+the window is off-primary. That reintroduces the maximized-window defect
+described above, on exactly the monitor where it is least likely to be noticed,
+and trades a rare missed deferral for a permanent one. A missed deferral costs
+one badly-timed offer; a false deferral costs every break.
+
+Detecting fullscreen on non-primary displays needs a method that does not rely
+on geometry. That is an open question for P6, recorded in
+[ROADMAP.md](ROADMAP.md); until it is answered, the limitation stands as
+written.
+
 ## No flag for an owed break
 
 `DEFERRED` **is** the owed break, postponed. There is no `break_owed` field

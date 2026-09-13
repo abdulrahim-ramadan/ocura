@@ -64,6 +64,18 @@ First-run setup and full configuration of schedules and detectors.
 
 Animations, typography, accessibility, dark and light themes.
 
+**Open question: detecting fullscreen on non-primary displays.**
+`SHQueryUserNotificationState` watches the primary display only — measured, a
+window covering a secondary monitor exactly still reports
+`ACCEPTS_NOTIFICATIONS`, so a fullscreen video on a second screen is not
+detected. This needs a method that does not rely on window geometry; falling
+back to rectangle comparison reintroduces the maximized-window defect. See
+[architecture.md](architecture.md#known-limitation-fullscreen-on-a-non-primary-display).
+
+Also flagged for here: "idle **and** the foreground window has not changed for
+N minutes" as a reading discriminator, which would make long idle with a
+*changed* window creditable rest.
+
 ## P7 — Packaging
 
 Windows installer, code signing, GitHub Releases.
