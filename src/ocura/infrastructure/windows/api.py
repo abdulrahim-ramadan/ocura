@@ -19,9 +19,17 @@ from ctypes import wintypes
 _user32 = ctypes.WinDLL("user32", use_last_error=True)
 _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 _shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+_wtsapi32 = ctypes.WinDLL("wtsapi32", use_last_error=True)
 
 SPI_GETSCREENSAVERRUNNING = 0x0072
 DESKTOP_SWITCHDESKTOP = 0x0100
+
+WTS_CURRENT_SESSION = 0xFFFFFFFF
+WTS_SESSION_INFO_EX = 25
+#: Windows 8 and later. Windows 7 and Server 2008 R2 invert these two, which is
+#: irrelevant here: Ocura requires Windows 10 or newer.
+WTS_SESSIONSTATE_LOCK = 0
+WTS_SESSIONSTATE_UNLOCK = 1
 
 QUNS_NOT_PRESENT = 1
 QUNS_BUSY = 2
@@ -48,6 +56,35 @@ class _LASTINPUTINFO(ctypes.Structure):
     _fields_ = (("cbSize", wintypes.UINT), ("dwTime", wintypes.DWORD))
 
 
+class _WTSINFOEX_LEVEL1(ctypes.Structure):
+    """Declared in full: the trailing fields set the struct's 8-byte alignment,
+    and truncating them silently shifts SessionFlags to the wrong offset."""
+
+    _fields_ = (
+        ("SessionId", wintypes.DWORD),
+        ("SessionState", ctypes.c_int),
+        ("SessionFlags", ctypes.c_long),
+        ("WinStationName", wintypes.WCHAR * 33),
+        ("UserName", wintypes.WCHAR * 21),
+        ("DomainName", wintypes.WCHAR * 18),
+        ("LogonTime", ctypes.c_longlong),
+        ("ConnectTime", ctypes.c_longlong),
+        ("DisconnectTime", ctypes.c_longlong),
+        ("LastInputTime", ctypes.c_longlong),
+        ("CurrentTime", ctypes.c_longlong),
+        ("IncomingBytes", wintypes.DWORD),
+        ("OutgoingBytes", wintypes.DWORD),
+        ("IncomingFrames", wintypes.DWORD),
+        ("OutgoingFrames", wintypes.DWORD),
+        ("IncomingCompressedBytes", wintypes.DWORD),
+        ("OutgoingCompressedBytes", wintypes.DWORD),
+    )
+
+
+class _WTSINFOEX(ctypes.Structure):
+    _fields_ = (("Level", wintypes.DWORD), ("Data", _WTSINFOEX_LEVEL1))
+
+
 _user32.GetLastInputInfo.argtypes = (ctypes.POINTER(_LASTINPUTINFO),)
 _user32.GetLastInputInfo.restype = wintypes.BOOL
 _kernel32.GetTickCount64.restype = ctypes.c_ulonglong
@@ -64,6 +101,16 @@ _user32.SystemParametersInfoW.argtypes = (
 _user32.SystemParametersInfoW.restype = wintypes.BOOL
 _shell32.SHQueryUserNotificationState.argtypes = (ctypes.POINTER(ctypes.c_int),)
 _shell32.SHQueryUserNotificationState.restype = ctypes.HRESULT
+_wtsapi32.WTSQuerySessionInformationW.argtypes = (
+    wintypes.HANDLE,
+    wintypes.DWORD,
+    ctypes.c_int,
+    ctypes.POINTER(ctypes.c_void_p),
+    ctypes.POINTER(wintypes.DWORD),
+)
+_wtsapi32.WTSQuerySessionInformationW.restype = wintypes.BOOL
+_wtsapi32.WTSFreeMemory.argtypes = (ctypes.c_void_p,)
+_wtsapi32.WTSFreeMemory.restype = None
 
 
 def idle_seconds() -> float:
@@ -80,13 +127,56 @@ def idle_seconds() -> float:
     return ((now - info.dwTime) & 0xFFFFFFFF) / 1000.0
 
 
-def is_locked() -> bool:
-    """True when the input desktop cannot be opened, which is what locking does."""
+def locked_via_wts() -> bool | None:
+    """Authoritative lock state, or None if the session could not be queried."""
+    buffer = ctypes.c_void_p()
+    returned = wintypes.DWORD()
+    ok = _wtsapi32.WTSQuerySessionInformationW(
+        None,
+        WTS_CURRENT_SESSION,
+        WTS_SESSION_INFO_EX,
+        ctypes.byref(buffer),
+        ctypes.byref(returned),
+    )
+    if not ok or not buffer:
+        return None
+    try:
+        info = ctypes.cast(buffer, ctypes.POINTER(_WTSINFOEX)).contents
+        flags = info.Data.SessionFlags
+    finally:
+        _wtsapi32.WTSFreeMemory(buffer)
+
+    if flags == WTS_SESSIONSTATE_LOCK:
+        return True
+    if flags == WTS_SESSIONSTATE_UNLOCK:
+        return False
+    return None
+
+
+def locked_via_input_desktop() -> bool:
+    """Fallback only. Reports the *secure desktop*, which is not the same thing.
+
+    OpenInputDesktop does not fail when the session locks; it fails once the
+    secure desktop actually becomes the input desktop, which typically waits for
+    the display to sleep. Measured against WTS on a real lock: WTS saw it at
+    00:38, this saw it at 01:05, and both saw the unlock at 01:08 — so a 30
+    second absence was measured as 3 seconds. Anything shorter than
+    break_duration is refused by satisfy_break, so the rest credit was silently
+    starved and no break was ever discharged. Keep this only for the case where
+    the WTS query itself fails.
+    """
     desktop = _user32.OpenInputDesktop(0, False, DESKTOP_SWITCHDESKTOP)
     if not desktop:
         return True
     _user32.CloseDesktop(desktop)
     return False
+
+
+def is_locked() -> bool:
+    locked = locked_via_wts()
+    if locked is None:
+        return locked_via_input_desktop()
+    return locked
 
 
 def is_screensaver_running() -> bool:
