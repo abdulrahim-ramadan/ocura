@@ -79,3 +79,37 @@ def due_timer(timer: BreakTimer, clock: FakeMonotonicClock) -> BreakTimer:
     clock.advance(timer.schedule.focus_interval)
     timer.tick()
     return timer
+
+
+@pytest.fixture
+def timer_for(schedule: BreakSchedule, clock: FakeMonotonicClock):
+    """A timer parked in a requested state, for tests that care about one."""
+    from ocura.domain.timer import TimerState
+
+    def build(state: TimerState) -> BreakTimer:
+        timer = BreakTimer(schedule, clock)
+        if state is TimerState.IDLE:
+            return timer
+        timer.start()
+        if state is TimerState.FOCUSING:
+            return timer
+        clock.advance(schedule.focus_interval - schedule.pre_break_warning)
+        timer.tick()
+        if state is TimerState.PRE_BREAK:
+            return timer
+        clock.advance(schedule.pre_break_warning)
+        timer.tick()
+        if state is TimerState.BREAK_DUE:
+            return timer
+        if state is TimerState.ON_BREAK:
+            timer.begin_break()
+            return timer
+        if state is TimerState.DEFERRED:
+            timer.defer()
+            return timer
+        if state is TimerState.PAUSED:
+            timer.pause()
+            return timer
+        raise AssertionError(f"no recipe for {state}")
+
+    return build
