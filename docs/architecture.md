@@ -602,6 +602,29 @@ on geometry. That is an open question for P6, recorded in
 [ROADMAP.md](ROADMAP.md); until it is answered, the limitation stands as
 written.
 
+## Tooling gotchas
+
+Each of these cost real time and none is guessable from the documentation. They
+are written down because remembering them has already failed.
+
+**A child `.ruff.toml` replaces a table, it does not merge it.**
+`src/ocura/ui/.ruff.toml` and `src/ocura/domain/.ruff.toml` both restate bans
+that `pyproject.toml` already declares. Dropping a line by "tidying up" does not
+inherit it — it removes it. The first version of the domain config silently made
+the domain the one layer where importing Qt was allowed.
+
+**`pytest_collection_modifyitems` in a subdirectory conftest receives the whole
+collection.** `tests/gui/conftest.py` marks tests `gui`, and the first version
+marked *every* test in the run, so `-m "not gui"` deselected all 216. The hook
+must filter by path.
+
+**`git add -A` sweeps in whatever else is in the tree.** It has put unrelated
+work into the wrong commit twice: the presenter into
+`feat: add user-initiated break command`, and the overlay geometry into
+`feat: add pre-break toast warning`. Neither was recoverable without rewriting
+pushed history. Stage explicit paths, always — `git add <paths>`, never `-A`
+or `.`, when a commit is meant to say one thing.
+
 ## No flag for an owed break
 
 `DEFERRED` **is** the owed break, postponed. There is no `break_owed` field
