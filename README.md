@@ -98,6 +98,17 @@ ruff format --check .
 The suite is fully deterministic and never sleeps: tests drive a fake clock and
 advance it instantly, so the whole run takes well under a second.
 
+## Troubleshooting
+
+**The tray icon is missing.** Windows files newly seen tray icons into the
+hidden overflow area — the chevron to the left of the clock — rather than the
+taskbar itself. Ocura is running and the icon is there; drag it out of the
+overflow onto the taskbar once and Windows will remember. There is no API to
+promote an icon out of the overflow, so this cannot be fixed in code.
+
+Ocura logs `tray icon shown` at startup, and logs an error if the system reports
+no tray is available.
+
 ## Architecture
 
 Domain -> Application -> Infrastructure -> future UI, with dependencies pointing

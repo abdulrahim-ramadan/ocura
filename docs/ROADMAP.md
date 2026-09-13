@@ -70,6 +70,27 @@ Overlay across all monitors, countdown, skip, snooze, notifications. Snooze is
 capped at two — beyond that the reminder has stopped being a reminder, and
 nagging is not a feature.
 
+**Ocura draws its own pre-break toast; it does not use OS notifications.**
+Measured on the development machine, `QSystemTrayIcon.supportsMessages()`
+returns **False**, so balloon notifications are simply unavailable there — and a
+capability that varies silently by machine is the wrong foundation for the one
+message that has to arrive before a break. A small always-on-top window Ocura
+draws itself works everywhere, is styled from the same tokens as the rest of the
+app, and can be tested without a notification service.
+
+Two conditions on it, decided now rather than discovered later:
+
+- **It must not take focus.** `Qt::WindowDoesNotAcceptFocus` and
+  `WA_ShowWithoutActivating`, no activation, no keyboard steal. A toast that
+  interrupts typing is worse than the notification it replaced.
+- **It does not inherit Focus Assist for free.** An OS notification would be
+  suppressed during Do Not Disturb; a self-drawn window would not. Ocura is
+  covered because `PresentationDetector` already consults
+  `SHQueryUserNotificationState` — which reports `QUNS_QUIET_TIME` and the
+  fullscreen states — and defers the break before any toast is considered.
+  That suppression lives in the detector layer, so removing or weakening the
+  detector would silently make the toast rude.
+
 **The guided blink cue and the receding focus shape live here, not on the
 dashboard.** Both were considered for the P2 dashboard and rejected: peripheral
 motion pulls the eye involuntarily, so a permanently animating element on a
