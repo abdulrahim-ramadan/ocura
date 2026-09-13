@@ -50,10 +50,19 @@ way to know a user is on a call across every conferencing app, and a detector
 that is wrong half the time makes the interruption decision worse, not better.
 It waits until there is a method worth trusting.
 
-## P2 — Application shell
+## P2 — Application shell (complete)
 
-Tray icon, main window, navigation. The visible surface, with the domain
-already finished behind it.
+Tray icon, main window, navigation, and a live dashboard. The visible surface,
+with the domain already finished behind it.
+
+The Qt boundary is described in
+[architecture.md](architecture.md#the-qt-boundary): widgets read an immutable
+`SessionView` from `BreakPresenter` and never touch the engine, the presenter
+owns the tick while Qt only delivers the pulse, and one QSS template built from
+tokens carries both themes so P6 can restyle without touching a widget.
+
+Statistics and Settings are navigable and honestly empty — they say what is
+coming and when, rather than showing invented data.
 
 ## P3 — Break experience
 

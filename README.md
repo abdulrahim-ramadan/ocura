@@ -32,15 +32,15 @@ screen, display state — are platform-specific by nature.
 telemetry, no analytics. Nothing leaves the machine. When persistence arrives in
 P4, the schema will carry no user identifier of any kind.
 
-## Current status: P1, engine and Windows context
+## Current status: P2, application shell
 
-P0 built the framework-free core: the break state machine, the clock
-abstractions it runs on, and the vocabulary for context-aware decisions. P1 adds
-the Windows detectors that decide when interrupting is appropriate.
+P0 built the framework-free core, P1 the Windows detectors that decide when
+interrupting is appropriate, and P2 the first user-visible surface: a tray icon
+and a window showing live session state.
 
-There is still no user interface. `pytest` and `python scripts/demo.py` — a
-terminal harness, not a preview of the UI — are currently the only ways to
-exercise Ocura.
+Ocura runs. There is no break overlay yet — a break currently happens on the
+dashboard and in the tray tooltip, not across your screen — and nothing is
+saved to disk, so Statistics and Settings are navigable but empty.
 
 | Area | Status |
 | --- | --- |
@@ -52,7 +52,9 @@ exercise Ocura.
 | Deterministic test suite | Implemented |
 | Rest credit from session lock, expiring and spent once | Implemented |
 | Windows context detection (idle, session lock, fullscreen, screensaver) | Implemented |
-| Tray icon, main window | Planned, P2 |
+| Tray icon, main window, navigation | Implemented |
+| Live dashboard, in-memory session log | Implemented |
+| Dark and light themes from one token set | Implemented |
 | Break overlay, countdown, notifications, snooze | Planned, P3 |
 | Persistence, settings, daily metrics | Planned, P4 |
 | Onboarding | Planned, P5 |
@@ -71,10 +73,19 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+Run Ocura:
+
+```powershell
+python -m ocura.ui.app
+```
+
+Closing the window hides it to the tray; quit from the tray menu.
+
 Run the tests:
 
 ```powershell
-pytest
+pytest                  # everything
+pytest -m "not gui"     # skip anything needing a display
 ```
 
 Run the linter and the formatter check:

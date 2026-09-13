@@ -378,6 +378,63 @@ reconfirmed on a second app and a second monitor.
 
 Its limitation is recorded in the next section.
 
+## The Qt boundary
+
+`ocura.ui` is the only package permitted to import a UI toolkit, enforced by
+`src/ocura/ui/.ruff.toml` — which drops the inherited `PySide6` ban and restates
+the platform and storage bans, since a child table replaces rather than merges.
+It additionally bans `ocura.domain.timer.BreakTimer` and `ocura.domain.policy`
+outright: a widget that reaches for either has crossed the line this section
+exists to draw.
+
+### The presenter holds the seam
+
+`BreakPresenter` owns the `BreakSession`, advances it, and renders everything a
+view needs into one immutable `SessionView`. Widgets read that snapshot and
+nothing else. They never see a `BreakTimer`, a `BreakPolicy` or a detector, and
+they do no arithmetic on domain enums.
+
+Finished **text** lives in the snapshot too — `headline`, `detail`,
+`countdown_text`, `waiting_reason`. That is deliberate: the language rules are a
+product decision, and `test_no_event_text_is_accusatory` can assert them across
+every state without a display, which a widget test could not.
+
+The presenter is testable with a `FakeMonotonicClock` and a scripted context, no
+`QApplication` and no widget anywhere. If it ever needs a window to test, the
+seam has moved to the wrong place.
+
+### The presenter owns the tick; Qt delivers the pulse
+
+`TickDriver` is a `QTimer` and a signal. It holds no state and decides nothing.
+
+A pulse must never mean *"one second has passed."* Qt timers coalesce under
+load, stall behind modal dialogs and drift across sleep and resume. Every
+duration in Ocura is re-read from the monotonic clock on each pulse, so a late,
+dropped or doubled pulse costs refresh latency and cannot corrupt a measurement
+— the same property that makes `BreakTimer.tick()` safe to call at any rate.
+`TICK_SECONDS` therefore lives in the presenter as advisory cadence, and tests
+pulse in a plain loop.
+
+Detector polling rides on the same pulse: `BreakPresenter.tick()` calls
+`context.poll()` when the context satisfies `PollableContext`, so lock time
+accumulates even when no break is owed.
+
+### One engine per machine
+
+Two processes would tick two independent `BreakTimer`s against the same person,
+double-count every break and disagree in the tray. `SingleInstance` claims a
+`QLocalServer` pipe; a second launch finds it, asks the first to show itself and
+exits. A pipe rather than a lock file because a lock file outlives the crash
+that left it behind and then blocks every future launch.
+
+### Styling
+
+One QSS template built from `Tokens`, applied once at application level. No
+widget names a colour and none calls `setStyleSheet` — `test_no_widget_module_hardcodes_a_colour`
+greps the package to keep it that way, so P6 can restyle by editing token values
+rather than hunting through widgets. Dark and light are the same template with
+different token values.
+
 ## Known limitation: fullscreen on a non-primary display
 
 `SHQueryUserNotificationState` watches the primary display only. Measured on a
