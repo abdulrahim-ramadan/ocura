@@ -618,6 +618,18 @@ collection.** `tests/gui/conftest.py` marks tests `gui`, and the first version
 marked *every* test in the run, so `-m "not gui"` deselected all 216. The hook
 must filter by path.
 
+**Read build output, do not grep it.** A release build was failing on
+`PermissionError: dist\Ocura` — a running `Ocura.exe` holding the folder — for
+two runs while a `| grep` over its output hid the failure, so the icon under
+investigation was being extracted from a stale binary from the previous day.
+`build_release.py` now reports that case in one sentence, but the habit is the
+fix: pipe to `tail`, never to `grep`, when the question is "did this work".
+
+**`QWidget.grab()` cannot show a compositing fault.** It re-renders the widget
+directly, so screenshots taken that way looked correct for the entire life of
+the overlapping-label defect. Capturing the actual screen with
+`QGuiApplication.primaryScreen().grabWindow(0)` reproduced it immediately.
+
 **`git add -A` sweeps in whatever else is in the tree.** It has put unrelated
 work into the wrong commit twice: the presenter into
 `feat: add user-initiated break command`, and the overlay geometry into
