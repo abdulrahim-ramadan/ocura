@@ -126,14 +126,26 @@ touching the break logic. See [docs/architecture.md](docs/architecture.md).
 ## Trial build
 
 ```powershell
-.venv\Scripts\pyinstaller.exe packaging\ocura.spec --noconfirm
+.venv\Scripts\python.exe scriptsuild_release.py
 ```
 
-Produces `dist\Ocura\`, a self-contained folder to hand over as-is. It is
-gitignored and never committed. `--onedir` is deliberate and not a preference:
-PySide6 ships Qt under the LGPL v3, which requires that the recipient be able to
-replace the Qt libraries, and a one-file build unpacks to a temporary directory
-with nothing durable to replace. See `licenses/THIRD_PARTY_NOTICES.md`.
+One command: it runs ruff and pytest first and refuses to build if either
+fails, packages with `packaging\ocura.spec`, adds the licence notices and a
+read-me, checks the result can find its own resources, and prints the path.
+
+The output is `dist\Ocura\` — hand over the **whole folder**, the executable
+alone will not run. It is gitignored and never committed.
+
+`--onedir` is an obligation, not a preference: PySide6 ships Qt under the
+LGPL v3, which requires that the recipient can replace the Qt libraries, and a
+one-file build unpacks to a temporary directory with nothing durable to
+replace. See `licenses/THIRD_PARTY_NOTICES.md`.
+
+For a shortcut on your Desktop pointing at the last build:
+
+```powershell
+.venv\Scripts\python.exe scripts\make_shortcut.py
+```
 
 If a build does not start on someone else's machine:
 
@@ -143,6 +155,18 @@ Ocura.exe --self-check > selfcheck.txt
 
 reports whether the bundle resolved its icon and stylesheet, without needing a
 console window.
+
+### Why assets live inside the package
+
+Icons and the stylesheet live in `src/ocura/ui/assets/` and `src/ocura/ui/`,
+not at the repository root, because they are **package data** and have to
+travel inside the bundle. A path built relative to the repository — or from
+`__file__` and a few `parents[n]` — resolves fine while you are running from a
+checkout and stops resolving the moment the app is frozen, because the person
+running the executable has no repository. Everything is therefore loaded through
+`importlib.resources`, which reads from the source tree and from the bundle
+identically, and the PyInstaller spec copies those files to the same import path
+so neither route has to know which one it is on.
 
 ## Licensing
 
