@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -70,6 +71,7 @@ class DashboardView(QWidget):
         self._events.setObjectName("EventList")
         self._events.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         self._events.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._events.setMinimumHeight(SPACING.xl)
         self._last_headline = ""
 
         self._build()
@@ -110,7 +112,17 @@ class DashboardView(QWidget):
             metrics_layout.addLayout(column)
         metrics_layout.addStretch(1)
 
+        # The status card and the metrics row take exactly the height their text
+        # needs and no less. Without this the column over-subscribes the window,
+        # every child is squeezed below its own minimum, and 44px digits are
+        # drawn into a 20px box — which reads on screen as the headline and the
+        # countdown printed on top of each other. Only the event list, which
+        # scrolls, is allowed to absorb a shortfall.
+        status.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        metrics.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
         events = _card()
+        events.setMinimumHeight(SPACING.xl * 4)
         events_layout = QVBoxLayout(events)
         events_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
         events_layout.setSpacing(SPACING.sm)
@@ -135,13 +147,27 @@ class DashboardView(QWidget):
 
         # Left-aligned rather than centred: the column stays anchored to the
         # sidebar instead of floating away from it as the window widens.
+        # Scrolled, so a short or narrow window can never squeeze the column.
+        # Squeezing is not benign here: Qt hands each child less height than its
+        # text needs and the text is drawn outside its box, which on screen reads
+        # as the headline and the countdown printed on top of each other. There
+        # is no minimum window size that prevents it — a narrower window wraps
+        # the detail line onto more lines and needs *more* height — so the fix
+        # has to be structural rather than a number.
+        scroller = QScrollArea()
+        scroller.setObjectName("Page")
+        scroller.setWidget(content)
+        scroller.setWidgetResizable(True)
+        scroller.setFrameShape(QFrame.Shape.NoFrame)
+        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         # The column takes the stretch so it grows to its cap, and a zero-weight
         # spacer absorbs whatever is left. Without the spacer Qt centres a
         # size-capped widget in its cell and the column floats away from the
         # sidebar; with the spacer weighted, the column never reaches the cap.
         root = QHBoxLayout(self)
         root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
-        root.addWidget(content, 1)
+        root.addWidget(scroller, 1)
         root.addStretch(0)
 
     def render(self, view: SessionView) -> None:

@@ -64,6 +64,10 @@ QLabel {{
 
 /* --- cards ------------------------------------------------------------ */
 
+#Page, #Page > QWidget > QWidget, #Content {{
+    background: transparent;
+}}
+
 #Card {{
     background: {surface};
     border: 1px solid {border};

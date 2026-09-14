@@ -81,18 +81,32 @@ class Motion:
         )
 
     def fade_in(self, widget: QWidget) -> None:
-        """Soften a state change. Called on change only, never on every tick."""
-        if not self.enabled:
+        """Soften a state change. Called on change only, never on every tick.
+
+        The effect is removed the moment the fade ends, and this is not tidiness.
+        A QGraphicsEffect renders its widget through a cached source pixmap, and
+        a child repainting on its own — a label whose text changes every second —
+        does not invalidate that cache. Leaving the effect attached therefore
+        composites the cached frame with the live one: the dashboard drew
+        "Focusing" underneath the countdown, and two different countdown values
+        at once, for as long as the window stayed open.
+
+        Nothing is faded that is not being replaced, and nothing stays faded.
+        """
+        if not self.enabled or widget.graphicsEffect() is not None:
+            # A fade is already running. Stacking effects is what left one
+            # attached permanently in the first place.
             return
+
         effect = QGraphicsOpacityEffect(widget)
         widget.setGraphicsEffect(effect)
-        self._run(
-            QPropertyAnimation(effect, b"opacity", effect),
-            MIN_FADE_FROM,
-            1.0,
-            FADE_MS,
-            QEasingCurve.Type.OutCubic,
-        )
+
+        # Parented to the widget, not to the effect: the finished handler
+        # deletes the effect, and an animation must not be destroyed while it is
+        # emitting.
+        animation = QPropertyAnimation(effect, b"opacity", widget)
+        animation.finished.connect(lambda: widget.setGraphicsEffect(None))
+        self._run(animation, MIN_FADE_FROM, 1.0, FADE_MS, QEasingCurve.Type.OutCubic)
 
     def recede(self, shape: QWidget, seconds: float, to: float) -> None:
         """Shrink the focus shape once, across the whole break.

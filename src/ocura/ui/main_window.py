@@ -17,8 +17,12 @@ from ocura.ui.motion import MOTION
 from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import DashboardView, PlaceholderView
 
-DEFAULT_SIZE = QSize(880, 640)
-MIN_SIZE = QSize(720, 520)
+DEFAULT_SIZE = QSize(880, 660)
+
+#: The dashboard scrolls, so this is a comfort floor rather than a correctness
+#: one. Squeezed-text overlap is prevented structurally in DashboardView, not by
+#: forbidding small windows.
+MIN_SIZE = QSize(680, 520)
 
 
 class MainWindow(QMainWindow):
