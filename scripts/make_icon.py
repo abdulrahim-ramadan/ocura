@@ -1,7 +1,11 @@
-"""Regenerate the fallback icon. Pure stdlib, no image library.
+"""Regenerate the fallback icon: a plain lens drawn from nothing.
 
-Not the shipped icon: ocura.png beside it is, and this only stands in if that
-file is missing. A calm lens, deliberately plain — P6 owns the visual identity.
+NOT the shipped icon. ocura.png is the artwork and scripts/convert_icon.py turns
+it into ocura.ico; this file is only what resources.py falls back to if the real
+one is missing from a build. It writes ocura-fallback.ico under its own name for
+exactly that reason — an earlier version wrote ocura.ico and so silently became
+the icon on the executable and on every desktop shortcut, while the window and
+the tray used the real artwork.
 """
 
 from __future__ import annotations
@@ -9,7 +13,14 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parent.parent / "src" / "ocura" / "ui" / "assets" / "ocura.ico"
+OUT = (
+    Path(__file__).resolve().parent.parent
+    / "src"
+    / "ocura"
+    / "ui"
+    / "assets"
+    / "ocura-fallback.ico"
+)
 SIZES = (16, 24, 32, 48, 64, 128, 256)
 SS = 4  # supersampling factor for anti-aliasing
 

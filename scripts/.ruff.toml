@@ -1,0 +1,11 @@
+# Build tooling, not application code. It may import Qt — converting artwork
+# needs an image library and Qt is already here — because nothing in scripts/
+# is ever packaged or imported by the app. The platform and storage bans stay:
+# a build script has no more business calling ctypes than a widget does.
+#
+# This table REPLACES the one in pyproject.toml rather than merging with it.
+extend = "../pyproject.toml"
+
+[lint.flake8-tidy-imports.banned-api]
+"ctypes".msg = "Platform access belongs in ocura.infrastructure."
+"sqlite3".msg = "Persistence belongs in ocura.infrastructure (P4)."

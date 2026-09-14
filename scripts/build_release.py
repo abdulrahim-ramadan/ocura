@@ -58,7 +58,10 @@ EXPECTED = (
     "_internal/ocura/ui/style.qss",
     "_internal/ocura/ui/assets/ocura.png",
     "_internal/ocura/ui/assets/ocura.ico",
+    "_internal/ocura/ui/assets/ocura-fallback.ico",
 )
+
+ASSETS = ROOT / "src" / "ocura" / "ui" / "assets"
 
 
 def run(label: str, command: list[str]) -> None:
@@ -75,9 +78,78 @@ def gate() -> None:
     run("pytest", [str(PYTHON), "-m", "pytest", "-q"])
 
 
+def check_icon() -> None:
+    """Refuse to ship a build whose executable icon is the drawn placeholder.
+
+    The .ico is what Windows puts on the executable, the taskbar and every
+    shortcut; the .png is what Qt puts in the window and the tray. They came
+    from different files once and nobody noticed until a shortcut appeared with
+    a green ring on it. This compares the artwork rather than trusting a
+    filename, so regenerating the fallback over the real icon fails here.
+    """
+    print("\n>>> checking the executable icon is the real artwork")
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QGuiApplication, QImage
+
+    app = QGuiApplication.instance() or QGuiApplication([])
+
+    def difference(first: QImage, second: QImage) -> float:
+        size = 32
+        pair = [
+            image.convertToFormat(QImage.Format.Format_ARGB32).scaled(
+                size,
+                size,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            for image in (first, second)
+        ]
+        total = 0
+        for y in range(size):
+            for x in range(size):
+                left, right = (image.pixelColor(x, y) for image in pair)
+                total += (
+                    abs(left.red() - right.red())
+                    + abs(left.green() - right.green())
+                    + abs(left.blue() - right.blue())
+                    + abs(left.alpha() - right.alpha())
+                )
+        return total / (size * size * 4)
+
+    artwork = QImage(str(ASSETS / "ocura.png"))
+    shipped = QImage(str(ASSETS / "ocura.ico"))
+    placeholder = QImage(str(ASSETS / "ocura-fallback.ico"))
+    for name, image in (("ocura.png", artwork), ("ocura.ico", shipped)):
+        if image.isNull():
+            raise SystemExit(f"cannot read {name}")
+
+    to_artwork = difference(shipped, artwork)
+    to_placeholder = difference(shipped, placeholder)
+    print(f"    ocura.ico differs from the artwork by {to_artwork:.1f}")
+    print(f"    ocura.ico differs from the placeholder by {to_placeholder:.1f}")
+
+    if to_artwork >= to_placeholder:
+        raise SystemExit(
+            "ocura.ico looks like the drawn placeholder, not the artwork.\n"
+            r"Rebuild it:  .venv\Scripts\python.exe scripts\convert_icon.py"
+        )
+    del app
+
+
 def build() -> None:
     for stale in (DIST, BUILD):
-        shutil.rmtree(stale, ignore_errors=True)
+        try:
+            shutil.rmtree(stale)
+        except FileNotFoundError:
+            pass
+        except PermissionError as error:
+            # Windows will not let a running executable's folder be replaced,
+            # and PyInstaller's own message for this is a bare traceback.
+            raise SystemExit(
+                f"cannot clear {stale}: {error}\n"
+                "A previous build is still running. Quit Ocura from its tray "
+                "menu, or:  taskkill /F /IM Ocura.exe"
+            ) from error
     run(
         "pyinstaller",
         [
@@ -134,6 +206,7 @@ def main() -> int:
     else:
         gate()
 
+    check_icon()
     build()
     assemble()
     verify()
