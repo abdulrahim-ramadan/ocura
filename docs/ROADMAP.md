@@ -102,13 +102,33 @@ and the animation is the instruction rather than decoration. Recorded so it is
 not relitigated as a dashboard feature. See the motion policy in
 [architecture.md](architecture.md#motion-policy).
 
-## P4 — Persistence
+## P4 — Persistence (in progress)
 
 SQLite: sessions, settings, daily metrics.
 
 **No user identifier in the schema, ever.** Not a UUID, not a machine ID, not a
 hashed one. This is a permanent architectural constraint, not a default to be
-revisited: data that cannot identify anyone cannot leak anyone.
+revisited: data that cannot identify anyone cannot leak anyone. It is enforced
+by a test that reads the real `PRAGMA table_info` of a migrated database rather
+than the DDL that was meant to produce it.
+
+**Stage 1 — the event log (done).** One SQLite file at
+`%LOCALAPPDATA%\Ocura\ocura.db`, a versioned schema with an all-or-nothing
+migration path, and every `SessionEvent` written to it as the application runs.
+The seam is `SessionJournal`, a one-method protocol in the application layer,
+so nothing above `ocura.infrastructure.storage` knows a database exists — and
+`sqlite3` is now banned in the application layer too. Persistence is
+best-effort by design: a disk that cannot be written costs the user their
+history and never their break. See
+[architecture.md](architecture.md#p4--local-history).
+
+Verified end to end, not only by tests: the real application, on the real
+default schedule, took a real twenty-second break, and the four rows it wrote
+were read back out of the file by a separate process.
+
+**Stage 2 — settings**, moving the theme out of the registry and adding the
+schedule and detector tables. **Stage 3 — daily metrics** and the Statistics
+page, which stays honestly empty until there is something real to put in it.
 
 ## P5 — Onboarding and settings
 

@@ -715,6 +715,97 @@ same as forcing it: the user can still skip, and skipping says nothing about
 having skipped. The count is consecutive: a break actually taken resets it, so
 the cap limits a run of postponements rather than a day of them.
 
+## P4 — local history
+
+One SQLite file, written by `ocura.infrastructure.storage` and reached from
+above through a protocol that never mentions a database.
+
+### The seam
+
+`SessionJournal` (`application/journal.py`) is one method: `record(event)`.
+`BreakPresenter` takes one and tees every `SessionEvent` into it. Storage
+implements it, tests use a list, and `NullJournal` is what runs when there is
+nowhere to write — with the session behaving identically, which is the point.
+History is a record of the product working, never a part of it working.
+
+`sqlite3` is now banned in three layers rather than two:
+`src/ocura/application/.ruff.toml` joins the domain's and the UI's, because P4
+is the first milestone where the application layer would have had a reason to
+reach for it. Each of those tables *replaces* the parent's rather than merging
+with it, so each restates the `PySide6` ban — verified with a probe file,
+which showed `sqlite3`, `PySide6` and `ctypes` all refused in `application/`
+and `sqlite3` still allowed in `infrastructure/`.
+
+Nothing above the package ever sees a `sqlite3.Error`. Everything that leaves
+it is a plain dataclass or a `StorageError`, and the connection type is
+re-exported as `storage.Connection` so a caller can name one without importing
+the module it is banned from.
+
+### Persistence is best-effort; the engine is not
+
+A full disk, a file an antivirus scanner has locked, or a database written by a
+newer Ocura costs the user their history and must never cost them a break. The
+store reports failures honestly and `BreakPresenter._keep` is the single place
+that decides they are survivable. Its `except` is deliberately broad: a journal
+is a protocol, and an implementation failing in an unanticipated way still must
+not be able to stop the timer.
+
+The same rule at start-up. `open_history()` logs and returns a `NullJournal`
+rather than refusing to launch: everything the product actually does works with
+no database at all, and a start-up error about SQLite on a machine where the
+timer would have run fine is worse than the problem it reports.
+
+### One table, because a total is a second copy of the truth
+
+There is no `sessions` table and no `daily_metrics` table. A session is the run
+of events between a STARTED and the next STOPPED; a day's metrics are a count
+over a date range. Both are questions the log already answers, and a stored
+total is free to disagree with the events it claims to summarise — the same
+argument this codebase already made about owed breaks under "No flag for an
+owed break".
+
+`run` is the one column that is not an event: a local counter, incremented per
+launch, which exists because STARTED and STOPPED cannot delimit a run that
+ended in a crash, and two runs merged into one would be history that never
+happened. It says which launch a row belongs to and nothing else.
+
+**No user identifier, ever.** Not a UUID, not a machine ID, not a hashed one.
+`test_no_table_carries_anything_that_could_identify_anyone` migrates a real
+file, reads its actual `PRAGMA table_info`, and fails on any column name
+containing any of a list of words — so the constraint is checked against the
+schema that exists rather than against the one that was intended.
+
+### Migrations
+
+`PRAGMA user_version`, not a table of our own: one integer in the file header,
+written inside the same transaction as the DDL it describes, so it cannot get
+out of step with the schema it claims to describe. Migrations are a tuple in a
+module rather than a directory of numbered files — at this size the whole
+history fits on one screen, and a step that cannot be read next to the one
+before it is a step nobody will check.
+
+A step that fails rolls back with the version untouched. A half-applied
+migration carrying a version that claims otherwise is a database that fails the
+same way on every launch afterwards, with no way back, and there is a test that
+breaks a migration on purpose to prove it does not happen.
+
+A file from a **newer** Ocura is refused rather than migrated backwards. That
+build may have added a NOT NULL column this one knows nothing about, and
+writing rows the user's actual version cannot read is worse than losing the
+history.
+
+`isolation_level=None` with explicit BEGIN/COMMIT, because sqlite3's implicit
+handling opens a transaction before DML but not before DDL — exactly the wrong
+way round for a migration that has to be all-or-nothing.
+
+### WAL, read back rather than requested
+
+`PRAGMA journal_mode = WAL` **returns the mode SQLite settled on** instead of
+failing when it cannot honour the request, which a network share will do. The
+result is read back and a warning logged if it is not `wal`, and
+`synchronous = NORMAL` is applied only in that case — safe under WAL, where a
+power cut can cost the last transaction but never the integrity of the file.
+
 ## Known limitation: fullscreen on a non-primary display
 
 `SHQueryUserNotificationState` watches the primary display only. Measured on a
@@ -779,6 +870,20 @@ capture of the overlay taken with motion off shows the focus shape at
 because that is what the reduced-motion branch applies immediately. Two rounds
 of retuning went into a shape that was never the wrong size. Capture the break
 screen with motion **on**, timed a beat after the entry fade.
+
+**Microsoft Store Python redirects `%LOCALAPPDATA%` and says nothing.** A
+`.venv` built on the Store build of Python 3.13 runs inside the MSIX package
+sandbox, so a write to `C:\Users\<name>\AppData\Local\Ocura\ocura.db` actually
+lands in
+`...\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_*\LocalCache\Local\Ocura\`.
+The redirection is invisible from inside that process: `Path.exists()` returns
+True for the path that was asked for, `PRAGMA database_list` reports that same
+path back, and a log line saying where the database is can only ever repeat
+what it was told. The first end-to-end run of P4 therefore looked like a silent
+write failure and was not one. Only a look at the filesystem from **outside**
+the process settles where a file went. The packaged PyInstaller build is not
+redirected — measured with `Ocura.exe --self-check`, which reported a separate,
+empty database at the real location while the venv's copy held four rows.
 
 **`git add -A` sweeps in whatever else is in the tree.** It has put unrelated
 work into the wrong commit twice: the presenter into
