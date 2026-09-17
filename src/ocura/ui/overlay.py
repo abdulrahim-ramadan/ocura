@@ -4,7 +4,7 @@ One window per screen, kept in step with whatever screens exist at the moment.
 The visuals live elsewhere; this module decides only where windows go and when
 they come and go.
 
-Two ideas carry the whole design:
+Three ideas carry the whole design:
 
 *Reconciliation, not bookkeeping.* Every screen event — added, removed,
 resolution changed, primary changed — runs the same idempotent `_sync`, which
@@ -12,6 +12,12 @@ compares the windows that exist against the screens that exist and fixes the
 difference. Bespoke add and remove paths drift out of step with each other the
 first time two events arrive together; one function that can be called at any
 time from any event cannot.
+
+*Arrive and leave, do not appear.* A full screen changing in one frame is a
+shock to the eye, and this is the screen that exists to avoid exactly that, so
+both windows fade — which makes closing asynchronous. A window is therefore
+removed from the map the moment it is discarded, and held alive separately
+only until its fade has finished.
 
 *Cover, do not capture.* The overlay is deliberately not a kiosk. It sets no
 keyboard hook, holds no grab, runs no timer to re-assert itself above other
@@ -33,6 +39,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from ocura.application.presenter import SessionView
 from ocura.ui.break_screen import BreakScreen
+from ocura.ui.motion import MOTION
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +136,10 @@ class OverlayManager(QObject):
         super().__init__(parent)
         self._build = build
         self._windows: dict[QScreen, OverlayWindow] = {}
+        #: Discarded, no longer reachable through `windows`, still fading out. A
+        #: top-level widget with no parent is collected the moment the last
+        #: Python reference to it goes, which would take the animation with it.
+        self._closing: list[OverlayWindow] = []
         self._open = False
 
     @property
@@ -221,6 +232,9 @@ class OverlayManager(QObject):
         self._windows[screen] = window
         screen.geometryChanged.connect(self._on_screens_changed)
         window.place_on(screen)
+        # Before show(): the window has to be transparent in the frame it first
+        # appears in, or the fade begins one frame after the shock it prevents.
+        MOTION.fade_window_in(window)
         window.show()
         window.raise_()
         # Only the first window takes focus, so Esc has somewhere to land
@@ -236,5 +250,15 @@ class OverlayManager(QObject):
         # The QScreen may already be gone, taking the connection with it.
         with contextlib.suppress(RuntimeError):
             screen.geometryChanged.disconnect(self._on_screens_changed)
+        # Out of `windows` immediately, off the screen once it has faded: the
+        # manager's state must not wait on an animation, and `close()` has to
+        # leave nothing behind for a caller that checks straight afterwards.
+        self._closing.append(window)
+        MOTION.fade_window_out(window, lambda: self._dispose(window))
+
+    def _dispose(self, window: OverlayWindow) -> None:
+        """Called once per discarded window, whether or not it faded."""
+        if window in self._closing:
+            self._closing.remove(window)
         window.hide()
         window.deleteLater()

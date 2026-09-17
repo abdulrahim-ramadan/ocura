@@ -3,13 +3,15 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtGui import QColor, QImage, QPainter, QPalette, QRegion
+from PySide6.QtWidgets import QWidget
 
+from ocura.application.presenter import BREAK_TIPS
 from ocura.domain.timer import TimerState
-from ocura.ui.break_screen import SHAPE_MIN_SCALE, BreakScreen
-from ocura.ui.motion import Motion
-from ocura.ui.overlay import OverlayWindow
+from ocura.ui.break_screen import CUE_SPAN, SHAPE_MIN_SCALE, BlinkCue, BreakScreen
+from ocura.ui.motion import OVERLAY_FADE_MS, Motion
+from ocura.ui.overlay import OverlayManager, OverlayWindow
 from ocura.ui.theme import DARK, LIGHT, stylesheet
 
 from .test_shell import a_view
@@ -21,8 +23,56 @@ def on_break(**overrides):
         overlay_visible=True,
         break_remaining=14.0,
         countdown_text="0:14",
+        tip=BREAK_TIPS[0],
     )
     return replace(base, **overrides)
+
+
+def shown(qtbot, qapp, width=1920, height=1080) -> BreakScreen:
+    """A break screen at a realistic size, styled, laid out and rendered."""
+    qapp.setStyleSheet(stylesheet(DARK))
+    screen = BreakScreen()
+    qtbot.addWidget(screen)
+    screen.resize(width, height)
+    screen.render(on_break())
+    screen.show()
+    qtbot.wait(50)
+    return screen
+
+
+def painted(widget) -> QImage:
+    """What a paintEvent actually puts on the surface, on a known background.
+
+    A widget rendered onto a filled image, because the questions here are about
+    one paint routine's own geometry and alpha. Anything about how the overlay
+    composites with the desktop is a question QWidget.render cannot answer
+    either — that one is settled by capturing the real screen.
+
+    DrawWindowBackground is off: the background here is the overlay token the
+    widget will really sit on, and letting Qt paint its own would hide exactly
+    the alpha this is measuring.
+    """
+    image = QImage(widget.size(), QImage.Format.Format_ARGB32)
+    image.fill(QColor(DARK.overlay_bg))
+    painter = QPainter(image)
+    widget.render(painter, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren)
+    painter.end()
+    return image
+
+
+def gone(window) -> bool:
+    """Hidden, or disposed of outright — either way it is off the desktop."""
+    try:
+        return not window.isVisible()
+    except RuntimeError:
+        # The C++ object has been deleted, which is as gone as a window gets.
+        return True
+
+
+def drawn_width(image: QImage, row: int) -> int:
+    background = QColor(DARK.overlay_bg)
+    marked = [x for x in range(image.width()) if image.pixelColor(x, row) != background]
+    return max(marked) - min(marked) + 1 if marked else 0
 
 
 def test_the_message_invites_rather_than_instructs(qtbot):
@@ -167,3 +217,228 @@ def test_the_break_screen_renders_on_a_portrait_shape(qtbot, qapp):
     assert screen.shape.width() <= 1080
     # The shape does not stretch to fill the tall axis.
     assert screen.shape.height() < 1920
+
+
+# --- composition ----------------------------------------------------------
+
+
+def test_the_shape_sits_in_the_upper_third(qtbot, qapp):
+    """It floated in the middle, which left the text stranded below it."""
+    screen = shown(qtbot, qapp)
+    centre = screen.shape.geometry().center().y()
+
+    assert 0.20 < centre / screen.height() < 0.40
+
+
+def test_the_shape_and_the_text_are_one_optical_group(qtbot, qapp):
+    """The emptiness belongs at the outer edges, not between related things."""
+    screen = shown(qtbot, qapp)
+
+    inside = screen._message.geometry().top() - screen.shape.geometry().bottom()
+    above = screen.shape.geometry().top()
+    below = screen._tip.geometry().top() - screen.actions.geometry().bottom()
+
+    assert inside < above, "more space inside the group than above it"
+    assert inside < below, "more space inside the group than below it"
+
+
+def test_the_tip_is_the_last_thing_on_the_screen(qtbot, qapp):
+    """At the foot of the screen, and well clear of the controls."""
+    screen = shown(qtbot, qapp)
+
+    controls = screen.actions.geometry()
+    assert screen._tip.geometry().top() > controls.bottom()
+    assert screen.height() - screen._tip.geometry().bottom() < screen.height() * 0.1
+    # Further from the buttons than the buttons are from the countdown.
+    to_tip = screen._tip.geometry().top() - controls.bottom()
+    to_countdown = controls.top() - screen._countdown.geometry().bottom()
+    assert to_tip > to_countdown
+
+
+# --- typography and controls ----------------------------------------------
+
+
+def test_the_instruction_outweighs_everything_else_on_the_screen(qtbot, qapp):
+    screen = shown(qtbot, qapp)
+    instruction = screen._message.font().pixelSize()
+
+    for quieter in (screen._countdown, screen._tip, screen._skip, screen._snooze):
+        assert quieter.font().pixelSize() < instruction
+
+
+def test_the_controls_are_padded_enough_to_look_deliberate(qtbot, qapp):
+    """Too small to look intentional reads as an accident, not as an offer."""
+    screen = shown(qtbot, qapp)
+
+    for button in (screen._skip, screen._snooze):
+        assert button.height() >= button.font().pixelSize() * 2.5
+        assert button.width() >= button.height() * 1.5
+
+
+# --- the evidence line ----------------------------------------------------
+
+
+def test_the_tip_reaches_the_screen(qtbot, qapp):
+    """It never had a widget to land in, and no view ever carried one to put there."""
+    screen = shown(qtbot, qapp)
+
+    assert screen._tip.text() == BREAK_TIPS[0]
+    assert screen._tip.isVisible()
+    assert screen._tip.geometry().height() > 0
+
+
+def test_the_tip_is_the_faintest_text_on_the_screen(qtbot, qapp):
+    screen = shown(qtbot, qapp)
+    background = QColor(DARK.overlay_bg)
+
+    def distance(label) -> int:
+        colour = label.palette().color(QPalette.ColorRole.WindowText)
+        return abs(colour.lightness() - background.lightness())
+
+    assert distance(screen._tip) < distance(screen._countdown)
+    assert distance(screen._tip) < distance(screen._message)
+
+
+# --- the blink cue --------------------------------------------------------
+
+
+def test_the_cue_is_a_third_of_the_width_rather_than_a_rule(qtbot, qapp):
+    """A full-width hairline is a separator, and separators are furniture."""
+    qapp.setStyleSheet(stylesheet(DARK))
+    cue = BlinkCue()
+    qtbot.addWidget(cue)
+    cue.resize(1200, cue.height())
+    cue.set_openness(1.0)
+
+    assert drawn_width(painted(cue), cue.height() // 2) == pytest.approx(1200 * CUE_SPAN, rel=0.05)
+
+
+def test_the_cue_closes_from_both_ends_towards_its_centre(qtbot, qapp):
+    """A lid meets in the middle. Fading one out is not the same gesture."""
+    qapp.setStyleSheet(stylesheet(DARK))
+    cue = BlinkCue()
+    qtbot.addWidget(cue)
+    cue.resize(1200, cue.height())
+    row = cue.height() // 2
+    background = QColor(DARK.overlay_bg)
+
+    widths = []
+    for openness in (1.0, 0.6, 0.2):
+        cue.set_openness(openness)
+        image = painted(cue)
+        widths.append(drawn_width(image, row))
+        marked = [x for x in range(image.width()) if image.pixelColor(x, row) != background]
+        # Still centred: it closes inwards, it does not retract to one side.
+        assert (min(marked) + max(marked)) / 2 == pytest.approx(1200 / 2, abs=2)
+
+    assert widths[0] > widths[1] > widths[2]
+
+
+def test_the_cue_is_nearly_invisible_between_blinks(qtbot, qapp):
+    """A line sitting there at full strength is read once and then ignored."""
+    qapp.setStyleSheet(stylesheet(DARK))
+    cue = BlinkCue()
+    qtbot.addWidget(cue)
+    cue.resize(1200, cue.height())
+    row = cue.height() // 2
+    background = QColor(DARK.overlay_bg)
+
+    cue.set_openness(1.0)
+    at_rest = painted(cue).pixelColor(600, row)
+    cue.set_openness(0.3)
+    closing = painted(cue).pixelColor(600, row)
+
+    assert abs(at_rest.lightness() - background.lightness()) <= 6
+    assert abs(closing.lightness() - background.lightness()) > 20
+
+
+def test_the_cue_is_thicker_than_a_hairline(qtbot, qapp):
+    qapp.setStyleSheet(stylesheet(DARK))
+    cue = BlinkCue()
+    qtbot.addWidget(cue)
+    cue.resize(1200, cue.height())
+    cue.set_openness(0.5)
+
+    image = painted(cue)
+    background = QColor(DARK.overlay_bg)
+    rows = [y for y in range(cue.height()) if image.pixelColor(600, y) != background]
+
+    assert len(rows) >= 6
+
+
+# --- the focus shape ------------------------------------------------------
+
+
+def test_the_shape_has_no_edge_to_fixate_on(qtbot, qapp):
+    """A hard circle is a luminance step, which is exactly what pulls the eye."""
+    screen = shown(qtbot, qapp)
+    shape = screen.shape
+    image = painted(shape)
+
+    row = shape.height() // 2
+    background = QColor(DARK.overlay_bg)
+    marked = [x for x in range(shape.width()) if image.pixelColor(x, row) != background]
+    assert marked, "the shape drew nothing"
+
+    # Walk inwards from the rim: the step between neighbouring pixels stays
+    # small the whole way, which is what "no edge" means in measurable terms.
+    edge = min(max(marked), shape.width() - 2)
+    steps = [
+        abs(image.pixelColor(x, row).lightness() - image.pixelColor(x - 1, row).lightness())
+        for x in range(edge - 40, edge + 2)
+    ]
+    assert max(steps) <= 4, f"a {max(steps)}-step edge is a thing to look at"
+
+
+# --- arriving and leaving -------------------------------------------------
+
+
+def test_the_overlay_fades_in_rather_than_appearing(qtbot, qapp, still):
+    """A full screen changing in one frame is itself a shock to the eye."""
+    still.enabled = True
+    manager = OverlayManager()
+    manager.open()
+    try:
+        windows = list(manager.windows.values())
+        assert windows
+        for window in windows:
+            qtbot.addWidget(window)
+            assert window.windowOpacity() < 1.0
+        qtbot.waitUntil(
+            lambda: all(w.windowOpacity() == pytest.approx(1.0) for w in windows),
+            timeout=OVERLAY_FADE_MS * 5,
+        )
+    finally:
+        manager.close()
+
+
+def test_the_overlay_fades_out_and_is_gone_afterwards(qtbot, qapp, still):
+    still.enabled = True
+    manager = OverlayManager()
+    manager.open()
+    # Deliberately not handed to qtbot: the manager disposes of these itself,
+    # and that disposal is what the test is about.
+    windows = list(manager.windows.values())
+    qtbot.wait(OVERLAY_FADE_MS + 100)
+
+    manager.close()
+    # The manager's own state never waits on an animation.
+    assert manager.windows == {}
+    assert manager.is_open is False
+
+    qtbot.waitUntil(lambda: all(gone(window) for window in windows), timeout=OVERLAY_FADE_MS * 5)
+
+
+def test_reduced_motion_opens_the_overlay_at_full_opacity(qtbot, qapp, still):
+    """No fade, and above all no window left invisible on top of the desktop."""
+    still.enabled = False
+    manager = OverlayManager()
+    manager.open()
+    windows = list(manager.windows.values())
+    try:
+        for window in windows:
+            assert window.windowOpacity() == pytest.approx(1.0)
+    finally:
+        manager.close()
+
+    assert all(gone(window) for window in windows)

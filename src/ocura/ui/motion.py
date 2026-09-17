@@ -19,6 +19,7 @@ arrive before the previous one ends.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPropertyAnimation
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QProgressBar, QWidget
@@ -26,6 +27,13 @@ from PySide6.QtWidgets import QGraphicsOpacityEffect, QProgressBar, QWidget
 logger = logging.getLogger(__name__)
 
 FADE_MS = 200
+
+#: How long the break overlay takes to arrive and to leave. A full screen
+#: changing colour in one frame is itself a shock to the eye, which is the one
+#: thing this screen exists not to be; long enough to be a transition, short
+#: enough that nobody waits for it.
+OVERLAY_FADE_MS = 400
+
 #: Just under the tick, so the fill arrives as the next one starts and the bar
 #: glides instead of stepping.
 FILL_MS = 950
@@ -107,6 +115,48 @@ class Motion:
         animation = QPropertyAnimation(effect, b"opacity", widget)
         animation.finished.connect(lambda: widget.setGraphicsEffect(None))
         self._run(animation, MIN_FADE_FROM, 1.0, FADE_MS, QEasingCurve.Type.OutCubic)
+
+    def fade_window_in(self, window: QWidget) -> None:
+        """Bring a whole window up from nothing. Call it before show().
+
+        windowOpacity rather than a QGraphicsOpacityEffect: an effect renders
+        its widget through a cached source pixmap, and this window contains a
+        label that repaints itself every second without invalidating that
+        cache. The window property is composited by the platform and has no
+        such trap — see the note on fade_in.
+        """
+        if not self.enabled:
+            window.setWindowOpacity(1.0)
+            return
+        window.setWindowOpacity(0.0)
+        self._run(
+            QPropertyAnimation(window, b"windowOpacity", window),
+            0.0,
+            1.0,
+            OVERLAY_FADE_MS,
+            QEasingCurve.Type.OutCubic,
+        )
+
+    def fade_window_out(self, window: QWidget, then: Callable[[], None]) -> None:
+        """Take a whole window away, then hand back to the caller to dispose of it.
+
+        The callback always runs exactly once, reduced motion included, because
+        it is what actually closes the window — a caller that skipped it under
+        one branch would leak an invisible always-on-top window over the
+        desktop.
+        """
+        if not self.enabled:
+            then()
+            return
+        animation = QPropertyAnimation(window, b"windowOpacity", window)
+        animation.finished.connect(then)
+        self._run(
+            animation,
+            window.windowOpacity(),
+            0.0,
+            OVERLAY_FADE_MS,
+            QEasingCurve.Type.InCubic,
+        )
 
     def recede(self, shape: QWidget, seconds: float, to: float) -> None:
         """Shrink the focus shape once, across the whole break.

@@ -69,10 +69,14 @@ class Tokens:
     #: The break overlay is warm and dark in BOTH themes. A break screen exists
     #: to rest the eye, and a bright white one at the end of a focus block is
     #: the opposite of that — so this is the one surface the light theme does
-    #: not lighten.
+    #: not lighten. The values live in _OVERLAY: the ladder they form is the
+    #: whole design of that screen, and it is written down in one place rather
+    #: than reassembled by reading widgets.
     overlay_bg: str
     overlay_shape: str
+    overlay_cue: str
     overlay_text: str
+    overlay_text_muted: str
     overlay_text_faint: str
 
     font_family: str
@@ -80,6 +84,7 @@ class Tokens:
     font_size_m: str
     font_size_l: str
     font_size_xl: str
+    font_size_xxl: str
     font_size_display: str
 
     space_xs: str
@@ -102,6 +107,9 @@ _SHARED = {
     "font_size_m": "14px",
     "font_size_l": "17px",
     "font_size_xl": "22px",
+    #: The break instruction and nothing else. Between xl and display because
+    #: it is the only sentence on its screen and has to carry it alone.
+    "font_size_xxl": "32px",
     "font_size_display": "44px",
     "space_xs": f"{SPACING.xs}px",
     "space_s": f"{SPACING.s}px",
@@ -112,6 +120,33 @@ _SHARED = {
     "radius_s": "4px",
     "radius_m": "8px",
     "radius_l": "14px",
+}
+
+#: The break overlay, identical in both themes.
+#:
+#: The ratios in the comments are WCAG contrast against overlay_bg, measured
+#: rather than guessed, because the ordering *is* the design: the instruction
+#: is the only thing meant to be read, the shape is meant to be looked past,
+#: and the tip is meant to be found only if it is looked for.
+_OVERLAY = {
+    #: Low-saturation brown-charcoal. Neutral grey at this lightness reads as
+    #: switched-off hardware; the warmth is what makes it read as dimmed.
+    "overlay_bg": "#1a1512",
+    #: 27% lightness — a distant object, not a light source. Painted with a
+    #: radial falloff, so it has no edge for the eye to fixate on.    1.9:1
+    "overlay_shape": "#4f453b",
+    #: The eyelid cue, a shade brighter than the shape because it is a gesture
+    #: that has to register inside a second.                          2.9:1
+    "overlay_cue": "#6a5f52",
+    #: Muted sand, never white. The instruction gets its presence from size,
+    #: not from luminance.                                            7.6:1
+    "overlay_text": "#b8a68c",
+    #: The countdown and the controls: secondary by contrast as well as by
+    #: size, so neither competes with the instruction.                5.1:1
+    "overlay_text_muted": "#8c8172",
+    #: The tip. The faintest text on the screen by a wide margin — it is there
+    #: for whoever goes looking, and for nobody else.                 2.2:1
+    "overlay_text_faint": "#554d43",
 }
 
 DARK = Tokens(
@@ -127,10 +162,7 @@ DARK = Tokens(
     accent_text="#0f1416",
     accent_quiet="#243033",
     nav_selected="#1f2428",
-    overlay_bg="#141110",
-    overlay_shape="#241f1c",
-    overlay_text="#8f8681",
-    overlay_text_faint="#5f5854",
+    **_OVERLAY,
     **_SHARED,
 )
 
@@ -147,10 +179,7 @@ LIGHT = Tokens(
     accent_text="#ffffff",
     accent_quiet="#e4ecea",
     nav_selected="#eaeef1",
-    overlay_bg="#141110",
-    overlay_shape="#241f1c",
-    overlay_text="#8f8681",
-    overlay_text_faint="#5f5854",
+    **_OVERLAY,
     **_SHARED,
 )
 

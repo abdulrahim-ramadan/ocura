@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from ocura.application.presenter import TICK_SECONDS, BreakPresenter, SessionView
+from ocura.application.presenter import (
+    BREAK_TIPS,
+    TICK_SECONDS,
+    BreakPresenter,
+    SessionView,
+)
 from ocura.domain.context import Deferral, Interruptible, RestSatisfied
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import TimerState
@@ -336,3 +341,59 @@ class _Pollable:
 
     def assess(self, snapshot):
         return Interruptible()
+
+
+def test_the_break_screen_is_given_a_tip(presenter: BreakPresenter):
+    """It never reached the screen because nothing ever produced one."""
+    assert presenter.view().tip in BREAK_TIPS
+    assert presenter.view().tip
+
+
+def test_the_tip_does_not_change_while_a_break_is_running(
+    presenter: BreakPresenter,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    """A line that rewrote itself every second would be the loudest thing there."""
+    presenter.start()
+    run_for(presenter, clock, schedule.focus_interval)
+    assert presenter.view().state is TimerState.ON_BREAK
+
+    seen = {presenter.view().tip}
+    for _ in range(int(schedule.break_duration) - 1):
+        clock.advance(TICK_SECONDS)
+        seen.add(presenter.tick().tip)
+
+    assert len(seen) == 1
+
+
+def test_a_later_break_shows_a_different_tip(
+    presenter: BreakPresenter,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    presenter.start()
+    seen = []
+    for _ in range(len(BREAK_TIPS)):
+        run_for(presenter, clock, schedule.focus_interval)
+        seen.append(presenter.view().tip)
+        run_for(presenter, clock, schedule.break_duration)
+
+    assert len(set(seen)) == len(BREAK_TIPS)
+
+
+def test_every_tip_carries_the_source_it_rests_on():
+    """An unattributable claim about someone's eyes does not belong on screen."""
+    for tip in BREAK_TIPS:
+        assert "—" in tip, tip
+        _, source = tip.rsplit("—", 1)
+        assert len(source.strip()) > 10, tip
+
+
+def test_no_tip_instructs_or_scolds():
+    """The screen already says what to do; a second, smaller voice is nagging."""
+    forbidden = ("must", "should", "you need", "failed", "missed", "remember to")
+    for tip in BREAK_TIPS:
+        assert not [bad for bad in forbidden if bad in tip.lower()], tip

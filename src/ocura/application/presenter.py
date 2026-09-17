@@ -33,6 +33,23 @@ MAX_EVENTS = 100
 #: control the timer would refuse.
 _USER_MAY_ASK = frozenset({TimerState.FOCUSING, TimerState.BREAK_DUE, TimerState.DEFERRED})
 
+#: The line at the foot of the break screen. One per break, rotated so the same
+#: sentence is not read twice in a row.
+#:
+#: Each states the evidence the break rests on and stops there. It is not a
+#: second instruction: the screen already says what to do, and a smaller voice
+#: repeating it in the corner is nagging. The attribution is part of the text
+#: rather than decoration — a claim about someone's eyes that cannot be traced
+#: back to anyone is not worth putting on the screen at all.
+BREAK_TIPS = (
+    "Every 20 minutes, look at something 20 feet away for 20 seconds "
+    "— American Academy of Ophthalmology",
+    "Close work holds the lens under tension; looking into the distance is what "
+    "lets it relax — American Optometric Association",
+    "Blink rate falls by about half at a screen, which is what leaves eyes dry "
+    "— American Optometric Association",
+)
+
 
 @runtime_checkable
 class PollableContext(Protocol):
@@ -97,6 +114,12 @@ class SessionView:
     #: False when no session is running, so a view can disable the control
     #: rather than offer an action that would be refused.
     can_take_break_now: bool = False
+
+    #: The evidence line for the break screen. Chosen here rather than in the
+    #: widget: it is language, and the language rules are testable without a
+    #: display. Stable for the whole of one break, since it is keyed to the
+    #: count of breaks finished and that does not move while one is running.
+    tip: str = ""
 
 
 def _clock_text(seconds: float) -> str:
@@ -221,6 +244,7 @@ class BreakPresenter:
             snoozes_used=self._session.snoozes_used,
             events=tuple(self._events),
             can_take_break_now=self._running and state in _USER_MAY_ASK,
+            tip=BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)],
         )
 
     def tooltip(self) -> str:

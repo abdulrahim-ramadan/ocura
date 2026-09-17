@@ -485,6 +485,9 @@ loops, nothing pulses, nothing moves while the state is unchanged. The countdown
 fill is the only continuous-*looking* animation and it is not a loop: each tick
 starts a single interpolation that happens to arrive as the next begins.
 
+The break overlay's own fade is the fourth, and it is a transition rather than
+an ornament: a full screen changing colour in one frame is a shock to the eye.
+
 All animation is skipped when Windows reports reduced motion
 (`SPI_GETCLIENTAREAANIMATION`, read in the infrastructure layer since it is a
 platform call). A failed read leaves motion on: motion is the normal case, and
@@ -556,12 +559,90 @@ Two animations, each started once when the overlay opens and each lasting
 exactly the break: the focus shape recedes from 1.0 to 0.35, and an eyelid line
 closes three times. The blinks are key frames on a *single* animation rather
 than a repeating timer or an animation group, so when the run finishes nothing
-is left scheduled. Both are skipped under reduced motion, leaving a still screen
-with the number.
+is left scheduled. A third, the 400ms fade the window arrives and leaves on,
+is bounded by its own duration. All three are skipped under reduced motion,
+leaving a still screen with the number.
 
 This is the exception the motion policy allows, and it is bounded by the break's
 own length. An animated element on the *dashboard* remains ruled out for the
 reasons in that policy.
+
+### The screen is a ladder, not a palette
+
+Every colour on the overlay is in `theme.Tokens._OVERLAY`, identical in both
+themes, and what matters about them is their order. Measured as WCAG contrast
+against the background:
+
+| Element | Ratio | Why there |
+| --- | --- | --- |
+| focus shape | 1.9:1 | a distant object; it was the *brightest* thing here |
+| eyelid cue | 2.9:1 | only while closing; 1.1:1 the rest of the time |
+| tip | 2.2:1 | found only if looked for |
+| countdown, controls | 5.1:1 | available, never competing |
+| instruction | 7.6:1 | the one thing meant to be read |
+
+The background is a low-saturation brown-charcoal rather than a neutral grey.
+At this lightness neutral grey reads as switched-off hardware; the warmth is
+what makes the screen read as *dimmed*. The text is a muted sand and never
+white — presence comes from the type scale, not from luminance.
+
+`tests/unit/test_theme.py` asserts the ordering rather than the values, so P6
+can retune every colour and still fail the moment the argument stops holding.
+
+### Nothing on it has an edge
+
+The focus shape is painted with a radial alpha falloff: solid to 60% of its
+radius, gone by the rim. A hard circle is a luminance step, and a luminance
+step is precisely what the eye fixates on — on the one screen asking it to
+fixate on nothing. `test_the_shape_has_no_edge_to_fixate_on` walks inwards
+from the rim and fails if any neighbouring pair of pixels differs by more than
+four levels of lightness.
+
+Its box is exactly its extent, not a stretch weight. A box larger than what it
+paints put two hundred pixels of nothing between the shape and its own
+instruction, which is what made the text look stranded at the foot of the
+screen. Shape, cue, instruction, countdown and controls are one optical group
+in the upper third, each gap stated on its own line rather than by a uniform
+`setSpacing`; the emptiness is at the outer edges, where it belongs.
+
+### The eyelid closes, it does not fade
+
+A full-width hairline is a separator, and a separator is furniture — read once
+and never looked at again. The cue is a third of the screen wide, centred,
+eight pixels thick with rounded ends, and it **closes from both ends towards
+its centre**, because that is what a lid does. What fades is only its presence
+between blinks: at rest it sits at 1.1:1, which is there but not a line.
+
+### The tip
+
+The evidence-sourced line at the foot of the screen did not exist. There was no
+widget for it, no rule in the stylesheet, and no field on `SessionView` for one
+to come through — it had never been built, so "why does it not appear" has the
+dull answer. It now comes from `presenter.BREAK_TIPS` like every other piece of
+language in the product, one per break, keyed to the count of breaks finished
+so it cannot rewrite itself mid-break.
+
+Each states the evidence the break rests on and stops there. It is not a second
+instruction — the screen already says what to do, and a smaller voice repeating
+it in the corner is nagging — and each carries its source, because a claim
+about someone's eyes that cannot be traced back to anyone is not worth putting
+on screen at all.
+
+### Arriving and leaving
+
+The overlay fades in over 400ms and out again, through `windowOpacity` rather
+than a `QGraphicsOpacityEffect` — the effect's cached source pixmap is the
+defect described under the motion policy, and this window contains a label that
+repaints every second. An abrupt full-screen change is itself a shock to the
+eye, which is the one thing this screen exists not to be.
+
+That makes closing asynchronous, so `OverlayManager` drops a window from its
+map immediately and holds it in `_closing` only until the fade ends: the
+manager's own state never waits on an animation, and `close()` leaves nothing
+behind for a caller that looks straight afterwards. Under reduced motion the
+callback runs synchronously — it is what actually disposes of the window, so a
+branch that skipped it would leave an invisible always-on-top window over the
+desktop.
 
 ### Snooze, and where the cap lives
 
@@ -629,6 +710,13 @@ fix: pipe to `tail`, never to `grep`, when the question is "did this work".
 directly, so screenshots taken that way looked correct for the entire life of
 the overlapping-label defect. Capturing the actual screen with
 `QGuiApplication.primaryScreen().grabWindow(0)` reproduced it immediately.
+
+**Reduced motion hides the composition you are trying to photograph.** A
+capture of the overlay taken with motion off shows the focus shape at
+`SHAPE_MIN_SCALE` — its *receded* size, a third of what the break opens with —
+because that is what the reduced-motion branch applies immediately. Two rounds
+of retuning went into a shape that was never the wrong size. Capture the break
+screen with motion **on**, timed a beat after the entry fade.
 
 **`git add -A` sweeps in whatever else is in the tree.** It has put unrelated
 work into the wrong commit twice: the presenter into

@@ -133,3 +133,92 @@ def test_selection_is_marked_quietly(tokens: Tokens):
     checked = qss.split("#NavButton:checked")[1].split("}")[0]
     assert f"background: {tokens.nav_selected}" in checked
     assert f"border-left: 2px solid {tokens.accent}" in checked
+
+
+# --- the break overlay ----------------------------------------------------
+#
+# The overlay's colours are a ladder, not a palette: what matters is the order
+# of the rungs and the distance between them. Asserting the ladder rather than
+# the values leaves P6 free to retune every one of them and still fails the
+# moment the screen's own argument stops holding.
+
+
+def relative_luminance(colour: str) -> float:
+    """WCAG relative luminance of a #rrggbb string. No Qt needed for arithmetic."""
+
+    def channel(value: int) -> float:
+        srgb = value / 255
+        return srgb / 12.92 if srgb <= 0.04045 else ((srgb + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = (int(colour[start : start + 2], 16) for start in (1, 3, 5))
+    return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+
+
+def contrast(first: str, second: str) -> float:
+    one, other = relative_luminance(first), relative_luminance(second)
+    return (max(one, other) + 0.05) / (min(one, other) + 0.05)
+
+
+def lightness(colour: str) -> float:
+    """HSL lightness, which is what "25% luminance" means to the eye reading it."""
+    channels = [int(colour[start : start + 2], 16) for start in (1, 3, 5)]
+    return (max(channels) + min(channels)) / 2 / 255
+
+
+def is_warm(colour: str) -> bool:
+    red, green, blue = (int(colour[start : start + 2], 16) for start in (1, 3, 5))
+    return red > green > blue
+
+
+@pytest.mark.parametrize("tokens", [DARK, LIGHT], ids=lambda t: t.name)
+def test_the_overlay_is_warm_dark_rather_than_neutral_grey(tokens: Tokens):
+    """Neutral grey at this lightness reads as switched-off hardware."""
+    assert is_warm(tokens.overlay_bg)
+    assert lightness(tokens.overlay_bg) < 0.12
+
+
+@pytest.mark.parametrize("tokens", [DARK, LIGHT], ids=lambda t: t.name)
+def test_the_focus_shape_is_visible_but_never_radiant(tokens: Tokens):
+    """A quarter of the way up from black: a distant object, not a light source."""
+    assert 0.25 <= lightness(tokens.overlay_shape) <= 0.30
+
+
+@pytest.mark.parametrize("tokens", [DARK, LIGHT], ids=lambda t: t.name)
+def test_the_shape_is_the_dimmest_thing_on_the_break_screen(tokens: Tokens):
+    """It was the brightest, on a screen whose whole job is to rest the eye."""
+    against = tokens.overlay_bg
+    for brighter in (tokens.overlay_cue, tokens.overlay_text_faint):
+        assert contrast(tokens.overlay_shape, against) < contrast(brighter, against)
+
+
+@pytest.mark.parametrize("tokens", [DARK, LIGHT], ids=lambda t: t.name)
+def test_the_break_text_is_a_ladder_with_the_instruction_at_the_top(tokens: Tokens):
+    against = tokens.overlay_bg
+    instruction = contrast(tokens.overlay_text, against)
+    secondary = contrast(tokens.overlay_text_muted, against)
+    tip = contrast(tokens.overlay_text_faint, against)
+
+    assert tip < secondary < instruction
+    # The instruction is muted sand, not white: presence comes from size.
+    assert contrast("#ffffff", against) > instruction * 2
+
+
+@pytest.mark.parametrize("tokens", [DARK, LIGHT], ids=lambda t: t.name)
+def test_every_break_overlay_colour_is_warm(tokens: Tokens):
+    overlay = (
+        tokens.overlay_bg,
+        tokens.overlay_shape,
+        tokens.overlay_cue,
+        tokens.overlay_text,
+        tokens.overlay_text_muted,
+        tokens.overlay_text_faint,
+    )
+    assert [colour for colour in overlay if not is_warm(colour)] == []
+
+
+def test_the_overlay_ladder_is_the_same_in_both_themes():
+    """The break screen is one design, not two: a break is a break in any theme."""
+    dark, light = asdict(DARK), asdict(LIGHT)
+    overlay = [key for key in dark if key.startswith("overlay_")]
+    assert overlay
+    assert [key for key in overlay if dark[key] != light[key]] == []

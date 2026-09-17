@@ -235,31 +235,50 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     background: {overlay_bg};
 }}
 
-/* Read back from the palette by the custom paintEvent, so the shape's colour
-   is a token like everything else rather than a literal in Python. */
+/* Read back from the palette by the custom paintEvents, so the shape and the
+   cue take their colour from a token like everything else rather than from a
+   literal in Python. */
 #FocusShape {{
     color: {overlay_shape};
 }}
 
+#BlinkCue {{
+    color: {overlay_cue};
+}}
+
+/* The instruction. The one thing on the screen meant to be read, and sized
+   accordingly — presence comes from the type scale, not from luminance. */
 #BreakMessage {{
     color: {overlay_text};
-    font-size: {font_size_xl};
+    font-size: {font_size_xxl};
 }}
 
+/* Secondary information. Anyone who wants the number can find it; nobody
+   needs to watch it. */
 #BreakCountdown {{
-    color: {overlay_text_faint};
-    font-size: {font_size_m};
+    color: {overlay_text_muted};
+    font-size: {font_size_s};
 }}
 
+/* Tertiary, and deliberately not tiny: a control too small to look intentional
+   reads as an accident rather than as a choice the user is offered. */
 #BreakAction {{
     background: transparent;
     border: 1px solid {overlay_shape};
     border-radius: {radius_m};
-    color: {overlay_text_faint};
-    padding: {space_s} {space_m};
+    color: {overlay_text_muted};
+    font-size: {font_size_s};
+    padding: {space_sm} {space_lg};
 }}
 
 #BreakAction:hover, #BreakAction:focus {{
-    border-color: {overlay_text};
+    border-color: {overlay_text_muted};
     color: {overlay_text};
+}}
+
+/* The faintest thing on the screen. It is evidence, offered to whoever goes
+   looking for it, and it must never pull the eye back down to the display. */
+#BreakTip {{
+    color: {overlay_text_faint};
+    font-size: {font_size_s};
 }}
