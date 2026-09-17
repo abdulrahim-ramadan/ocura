@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
+from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.presenter import (
     BREAK_TIPS,
     TICK_SECONDS,
     BreakPresenter,
     SessionView,
 )
+from ocura.application.session import SessionEvent, SessionEventKind
 from ocura.domain.context import Deferral, Interruptible, RestSatisfied
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import TimerState
@@ -397,3 +401,99 @@ def test_no_tip_instructs_or_scolds():
     forbidden = ("must", "should", "you need", "failed", "missed", "remember to")
     for tip in BREAK_TIPS:
         assert not [bad for bad in forbidden if bad in tip.lower()], tip
+
+
+def an_event(kind: SessionEventKind = SessionEventKind.STARTED) -> SessionEvent:
+    return SessionEvent(kind=kind, at=datetime(2026, 9, 17, tzinfo=UTC), state=TimerState.IDLE)
+
+
+# --- the journal seam -----------------------------------------------------
+
+
+class RecordingJournal:
+    def __init__(self) -> None:
+        self.events: list[SessionEvent] = []
+
+    def record(self, event: SessionEvent) -> None:
+        self.events.append(event)
+
+
+class BrokenJournal:
+    """A disk that is full, a file an antivirus scanner has locked, a bug."""
+
+    def __init__(self) -> None:
+        self.attempts = 0
+
+    def record(self, event: SessionEvent) -> None:
+        del event
+        self.attempts += 1
+        raise OSError("no space left on device")
+
+
+def test_a_presenter_with_no_journal_still_runs(
+    schedule: BreakSchedule,
+    clock: FakeMonotonicClock,
+    wall_clock: FakeWallClock,
+    context: ScriptedContext,
+):
+    """The default is NullJournal, and the session cannot tell the difference."""
+    presenter = BreakPresenter(schedule, clock, wall_clock, context)
+    presenter.start()
+    view = run_for(presenter, clock, schedule.focus_interval)
+
+    assert view.state is TimerState.ON_BREAK
+
+
+def test_every_event_reaches_the_journal(
+    schedule: BreakSchedule,
+    clock: FakeMonotonicClock,
+    wall_clock: FakeWallClock,
+    context: ScriptedContext,
+):
+    """Including the ones the dashboard does not show. BREAK_DUE is noise on a
+    glance surface and evidence in a log."""
+    journal = RecordingJournal()
+    presenter = BreakPresenter(schedule, clock, wall_clock, context, journal=journal)
+
+    presenter.start()
+    run_for(presenter, clock, schedule.focus_interval)
+    run_for(presenter, clock, schedule.break_duration)
+
+    kinds = [event.kind for event in journal.events]
+    assert SessionEventKind.STARTED in kinds
+    assert SessionEventKind.BREAK_STARTED in kinds
+    assert SessionEventKind.BREAK_COMPLETED in kinds
+    assert SessionEventKind.BREAK_DUE in kinds, "the log dropped what the list filters"
+
+    # Nothing is recorded that the session did not emit.
+    shown = [line.text for line in presenter.view().events]
+    assert len(journal.events) > len(shown)
+
+
+def test_a_journal_that_raises_does_not_stop_the_break_engine(
+    schedule: BreakSchedule,
+    clock: FakeMonotonicClock,
+    wall_clock: FakeWallClock,
+    context: ScriptedContext,
+    caplog,
+):
+    """A full disk costs the user their history. It must never cost them a break."""
+    journal = BrokenJournal()
+    presenter = BreakPresenter(schedule, clock, wall_clock, context, journal=journal)
+
+    presenter.start()
+    view = run_for(presenter, clock, schedule.focus_interval)
+    assert view.state is TimerState.ON_BREAK
+
+    view = run_for(presenter, clock, schedule.break_duration)
+    assert view.state is TimerState.FOCUSING
+    assert view.breaks_taken == 1
+
+    assert journal.attempts > 0, "the journal was never even tried"
+    assert any("history is incomplete" in record.message for record in caplog.records)
+
+
+def test_the_null_journal_accepts_anything_and_says_nothing():
+    journal = NullJournal()
+    assert journal.record(an_event()) is None
+    assert isinstance(journal, SessionJournal)

@@ -2,14 +2,24 @@ from __future__ import annotations
 
 import logging
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
+from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.presenter import BreakPresenter, SessionView
 from ocura.domain.schedule import DEFAULT_SCHEDULE, BreakSchedule
 from ocura.infrastructure.clock import SystemMonotonicClock, SystemWallClock
+from ocura.infrastructure.storage import (
+    Connection,
+    EventStore,
+    StorageError,
+    close_database,
+    default_database_path,
+    open_event_store,
+)
 from ocura.infrastructure.windows.context import build_windows_context
 from ocura.ui import motion
 from ocura.ui.driver import TickDriver
@@ -30,6 +40,26 @@ APPLICATION = "Ocura"
 #: Shell state, kept apart from anything a user would call a setting. P5 moves
 #: the theme into the real settings model; window geometry stays here.
 THEME_KEY = "shell/theme"
+
+
+def open_history(path: Path | None = None) -> tuple[Connection | None, SessionJournal]:
+    """Open the history database, or carry on without one and say so.
+
+    Ocura does not fail to start because a disk did. Everything the product
+    actually does — time a focus block, read the context, cover the screen —
+    works with no database at all, so an unopenable one costs the user their
+    history and nothing else. The alternative, a start-up error dialog about
+    SQLite on a machine where the timer would have run perfectly well, is worse
+    than the problem it reports.
+    """
+    try:
+        connection, store = open_event_store(path)
+    except StorageError as exc:
+        logger.warning("history is unavailable, continuing without it: %s", exc)
+        return None, NullJournal()
+
+    logger.info("history at %s, run %d", path or default_database_path(), store.run)
+    return connection, store
 
 
 def initial_theme(settings: QSettings) -> str:
@@ -65,8 +95,13 @@ class OcuraApp:
         self._settings = settings or QSettings(ORGANISATION, APPLICATION)
 
         monotonic = SystemMonotonicClock()
+        self._database, self.journal = open_history()
         presenter = BreakPresenter(
-            schedule, monotonic, SystemWallClock(), build_windows_context(monotonic)
+            schedule,
+            monotonic,
+            SystemWallClock(),
+            build_windows_context(monotonic),
+            journal=self.journal,
         )
 
         motion.configure(Motion.from_system())
@@ -157,10 +192,13 @@ class OcuraApp:
         self.driver.start()
 
     def quit(self) -> None:
+        # Stop first: stopping emits a STOPPED event, and that event is part of
+        # the history this then closes the file on.
         self.driver.stop()
         self.overlay.close()
         self.toast.hide()
         self.tray.hide()
+        close_database(self._database)
         self._app.quit()
 
 
@@ -196,6 +234,17 @@ def self_check() -> int:
         qss = stylesheet(DARK)
         lines.append(f"stylesheet {QSS_PACKAGE}/{QSS_NAME}: {len(qss)} chars")
         lines.append(f"stylesheet resolved: {'ok' if DARK.accent in qss else 'BROKEN'}")
+
+        # A packaged build on someone else's machine is exactly where a
+        # permissions problem under %LOCALAPPDATA% shows up, and the log it
+        # would appear in is the one a windowed build does not have.
+        lines.append(f"history path: {default_database_path()}")
+        connection, journal = open_history()
+        if isinstance(journal, EventStore):
+            lines.append(f"history: ok, run {journal.run}, {journal.count()} events")
+        else:
+            lines.append("history: UNAVAILABLE (see the warning above)")
+        close_database(connection)
     finally:
         app.quit()
 

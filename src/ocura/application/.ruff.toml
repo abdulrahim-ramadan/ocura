@@ -1,0 +1,18 @@
+# Applies to src/ocura/application/ only. This layer wires the domain to
+# whatever is outside it, and it does so through protocols: MonotonicClock,
+# WallClock, ContextSource, SessionJournal. It names none of the concrete
+# things behind them. Adding P4's storage is exactly the moment that rule
+# stops being free, which is why the ban arrives with it.
+extend = "../../../pyproject.toml"
+
+# This table REPLACES the one in pyproject.toml, it does not merge with it, so
+# the inherited PySide6 ban has to be restated or the application layer becomes
+# one where a UI toolkit is allowed. Verified with a probe file, not assumed.
+[lint.flake8-tidy-imports.banned-api]
+"PySide6".msg = "No layer below the UI may import a UI toolkit."
+
+"sqlite3".msg = "Persistence belongs in ocura.infrastructure. Take a SessionJournal instead."
+"ctypes".msg = "Platform access belongs in ocura.infrastructure. Take a protocol instead."
+"ctypes.wintypes".msg = "Platform access belongs in ocura.infrastructure."
+"winreg".msg = "Platform access belongs in ocura.infrastructure."
+"msvcrt".msg = "Platform access belongs in ocura.infrastructure."

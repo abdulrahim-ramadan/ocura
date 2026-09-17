@@ -10,16 +10,20 @@ is delivered from outside, but what a tick *means* is decided here.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.session import BreakSession, SessionEvent, SessionEventKind
 from ocura.domain.clock import MonotonicClock, WallClock
 from ocura.domain.context import ContextSource
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import TimerState
+
+logger = logging.getLogger(__name__)
 
 #: How often a view should pulse the presenter. Advisory: every duration is read
 #: from the monotonic clock, so a late or missed pulse costs refresh latency and
@@ -140,11 +144,13 @@ class BreakPresenter:
         context: ContextSource,
         *,
         max_events: int = MAX_EVENTS,
+        journal: SessionJournal | None = None,
     ) -> None:
         self._schedule = schedule
         self._session = BreakSession(schedule, monotonic, wall_clock, context)
         self._context = context
         self._max_events = max_events
+        self._journal = journal or NullJournal()
         self._events: list[EventLine] = []
         self._waiting_reason: str | None = None
         self._breaks_taken = 0
@@ -283,8 +289,30 @@ class BreakPresenter:
                     return "Waiting for a good moment", f"Break owed — {self._waiting_reason}."
                 return "Waiting for a good moment", "Break owed."
 
+    def _keep(self, event: SessionEvent) -> None:
+        """Persistence is best-effort. The break engine is not.
+
+        A full disk, a file an antivirus scanner has locked, or a database
+        written by a newer Ocura must cost the user their history and never
+        their break. This is the one place that decision is made, which is why
+        the `except` is deliberately broad: a journal is a protocol, and an
+        implementation failing in a way nobody anticipated must still not be
+        able to stop the timer.
+
+        Events are rare — a handful per break — so a failure is logged every
+        time rather than sampled. A wall of these is a wall of real problems.
+        """
+        try:
+            self._journal.record(event)
+        except Exception:
+            logger.warning("could not record %s; history is incomplete", event.kind, exc_info=True)
+
     def _absorb(self, events: Sequence[SessionEvent]) -> None:
         for event in events:
+            # Every event is kept, including the ones the event list does not
+            # show. BREAK_DUE is noise on a dashboard and evidence in a log.
+            self._keep(event)
+
             match event.kind:
                 case SessionEventKind.BREAK_DEFERRED:
                     self._waiting_reason = event.detail or None
