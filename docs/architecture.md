@@ -1,5 +1,63 @@
 # Architecture
 
+## Verification discipline
+
+**Never state that something works unless the thing itself was observed, in the
+form the user encounters it.** Not a proxy, not a re-render, not a grep over
+output, not a passing test that exercises a different path.
+
+Every claim about this project carries the ground it rests on:
+
+| Label | Means |
+| --- | --- |
+| **MEASURED** | The actual artifact was observed, and the output is shown |
+| **TESTED** | A test asserts it, and what the test checks is stated |
+| **INFERRED** | Reasoned from code that was read, not observed running |
+| **UNVERIFIED** | Not checked |
+
+An INFERRED claim never gets the wording of a MEASURED one. "It should now
+work" and "it works" are different sentences, and the right one gets used. A
+failure is reported as a failure: "the build failed", never "the build
+completed with an issue". Where something cannot be verified, that is one line
+and then the work moves on — an honest UNVERIFIED costs nothing, and a
+confident claim that turns out to be false costs an hour and the credibility
+behind every other claim.
+
+Before calling anything done: *was this observed, or was something observed
+that stands in for it?* If the second, the proxy gets named along with what it
+cannot show.
+
+### The three incidents this rule is made of
+
+This is not a principle borrowed from somewhere. Three times in this project
+the verification method itself reported something other than reality, and each
+claim was made in good faith and was still wrong.
+
+**`QWidget.grab()` re-renders the widget and bypasses composited output.** It
+was used to screenshot the overlay throughout the life of the overlapping-label
+defect, and every screenshot looked correct while the real screen did not.
+`QGuiApplication.primaryScreen().grabWindow(0)` reproduced the fault on the
+first try. A re-render cannot show a compositing fault, because compositing is
+the step it skips.
+
+**Grepping build output instead of reading it hid a failing build for two
+days.** A release build was failing on `PermissionError: dist\Ocura` — a running
+`Ocura.exe` holding the folder — while a `| grep` over its output showed only
+the lines that were being looked for. The icon under investigation was being
+extracted from a stale binary from the previous day the whole time. When the
+question is "did this work", pipe to `tail` and read it; a grep can only
+confirm what was already assumed.
+
+**Capturing the break overlay with motion disabled showed the focus shape at
+its receded size.** Reduced motion applies the end state of an animation
+immediately, so the capture showed the shape at `SHAPE_MIN_SCALE` — a third of
+the size the break opens with. Two rounds of retuning went into a shape that
+was never wrong. A capture taken in a mode the user is not in is a capture of
+a different screen.
+
+The common shape of all three: the proxy was cheaper than the real thing, and
+the difference between them was exactly where the defect lived.
+
 ## Layers
 
 ```
@@ -687,6 +745,10 @@ written.
 
 Each of these cost real time and none is guessable from the documentation. They
 are written down because remembering them has already failed.
+
+Three of them appear again under [Verification discipline](#verification-discipline),
+where they are the evidence for the rule rather than the trap to avoid. The
+entries here are the operational form: what to do instead, next time.
 
 **A child `.ruff.toml` replaces a table, it does not merge it.**
 `src/ocura/ui/.ruff.toml` and `src/ocura/domain/.ruff.toml` both restate bans
