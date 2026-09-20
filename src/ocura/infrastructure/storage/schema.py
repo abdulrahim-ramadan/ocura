@@ -34,7 +34,7 @@ from datetime import UTC, datetime
 from ocura.infrastructure.storage.errors import FutureSchemaError
 
 #: What this build writes and expects to read.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 #: The migration ledger. Not listed in MIGRATIONS on purpose: it has to exist
 #: before the first step can record itself, including on a file that is being
@@ -77,6 +77,23 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         # evidence that distinguishes a twenty-second break from one ended at
         # nineteen point nine.
         "ALTER TABLE events ADD COLUMN duration REAL",
+    ),
+    (
+        # Settings, as name/value rather than a column each. A column each
+        # would be a migration every time P6 adds a preference, and this table
+        # will grow exactly that way; the type safety a column set would buy is
+        # bought instead by `Settings`, which is what every reader goes
+        # through and which refuses a value it cannot honour.
+        #
+        # Nothing identifying goes in here either. The constraint is about the
+        # database, not about one table in it, and the test that enforces it
+        # reads every table this migration leaves behind.
+        """
+        CREATE TABLE settings (
+            name  TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """,
     ),
 )
 

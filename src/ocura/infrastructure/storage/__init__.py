@@ -31,6 +31,7 @@ from ocura.infrastructure.storage.schema import (
     migration_log,
     schema_version,
 )
+from ocura.infrastructure.storage.settings import SettingsStore
 from ocura.infrastructure.storage.statistics import StatisticsStore, normalise_reason
 
 #: The connection type, re-exported so that callers above this package can name
@@ -45,6 +46,7 @@ __all__ = [
     "Connection",
     "EventStore",
     "FutureSchemaError",
+    "SettingsStore",
     "StatisticsStore",
     "StorageError",
     "StoredEvent",

@@ -133,6 +133,27 @@ class BreakTimer:
         self._retry_after = None
         self._start_focus_block(self._clock.monotonic())
 
+    def reschedule(self, schedule: BreakSchedule) -> None:
+        """Adopt a new schedule without touching a single stopwatch.
+
+        **The elapsed time is kept and measured against the new interval.**
+        That is the whole decision, and the two alternatives are both worse.
+        Restarting the block would silently erase work the user has already
+        done at the screen — they were there, and a setting they changed is not
+        a reason to pretend otherwise. Waiting a full new interval from now
+        would count the same stretch twice.
+
+        The consequence is deliberate: shortening the interval below what has
+        already accrued makes a break due on the next tick. That is not a
+        glitch, it is the honest answer to "remind me every fifteen minutes"
+        from someone who has been sitting there for twenty.
+
+        No transition happens here. `tick()` is what notices that the new
+        numbers have made something true, which keeps every state change in the
+        one place that has always owned them.
+        """
+        self._schedule = schedule
+
     def reset(self) -> None:
         now = self._clock.monotonic()
         self._resume_state = None

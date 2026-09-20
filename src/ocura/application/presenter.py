@@ -18,6 +18,7 @@ from typing import Protocol, runtime_checkable
 
 from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.session import BreakSession, SessionEvent, SessionEventKind
+from ocura.application.settings import DEFAULTS, Settings
 from ocura.domain.clock import MonotonicClock, WallClock
 from ocura.domain.context import ContextSource
 from ocura.domain.schedule import BreakSchedule
@@ -145,8 +146,10 @@ class BreakPresenter:
         *,
         max_events: int = MAX_EVENTS,
         journal: SessionJournal | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self._schedule = schedule
+        self._settings = settings or DEFAULTS
         self._session = BreakSession(schedule, monotonic, wall_clock, context)
         self._context = context
         self._max_events = max_events
@@ -159,6 +162,27 @@ class BreakPresenter:
         self._paused = False
 
     # --- commands, each returning the view the caller should render ---------
+
+    def apply(self, settings: Settings) -> SessionView:
+        """Adopt new settings, immediately, on whatever the session is doing.
+
+        Already validated: this takes a `Settings`, and one cannot be built
+        past `validate()` in a state the domain would refuse. Validation
+        belongs at the boundary where the user typed, not here where the only
+        honest response to a bad value would be to throw it at a running timer.
+
+        The elapsed focus time survives — see `BreakTimer.reschedule`, which
+        owns that decision and explains it. Nothing transitions here; the next
+        tick notices what the new numbers have made true.
+        """
+        self._settings = settings
+        self._schedule = settings.schedule()
+        self._session.reschedule(self._schedule)
+        return self.view()
+
+    @property
+    def settings(self) -> Settings:
+        return self._settings
 
     def start(self) -> SessionView:
         self._running = True
@@ -250,7 +274,12 @@ class BreakPresenter:
             snoozes_used=self._session.snoozes_used,
             events=tuple(self._events),
             can_take_break_now=self._running and state in _USER_MAY_ASK,
-            tip=BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)],
+            # Empty rather than absent when the user has turned them off: the
+            # break screen hides a tip it has not been given, and "no tip" is a
+            # thing the view can say without a second flag to say it with.
+            tip=(
+                BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)] if self._settings.tips else ""
+            ),
         )
 
     def tooltip(self) -> str:

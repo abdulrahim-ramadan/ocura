@@ -89,6 +89,16 @@ class BreakSession:
     def snapshot(self) -> TimerSnapshot:
         return self._timer.snapshot()
 
+    def reschedule(self, schedule: BreakSchedule) -> None:
+        """Apply a new schedule to the running timer. Emits nothing.
+
+        A settings change is not something that happened to the session, so it
+        is not a session event. What follows from it — a break becoming due
+        because the interval shrank — arrives through the next tick as the
+        ordinary event it is.
+        """
+        self._timer.reschedule(schedule)
+
     def start(self) -> SessionEvent:
         self._timer.start()
         return self._event(SessionEventKind.STARTED)

@@ -280,6 +280,10 @@ class BreakScreen(QWidget):
     def render(self, view: SessionView) -> None:
         self._countdown.setText(view.countdown_text)
         self._tip.setText(view.tip)
+        # Hidden rather than left as an empty label: an empty one still takes
+        # its line, and the spacing under the controls would read as a gap
+        # something failed to fill rather than as a screen with no tip on it.
+        self._tip.setVisible(bool(view.tip))
         # Past the cap the control goes away rather than sitting there disabled:
         # a greyed button invites a second look at something already decided.
         self._snooze.setVisible(view.can_snooze)
