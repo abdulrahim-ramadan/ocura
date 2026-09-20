@@ -122,9 +122,19 @@ best-effort by design: a disk that cannot be written costs the user their
 history and never their break. See
 [architecture.md](architecture.md#p4--local-history).
 
+Every break event is told apart rather than flattened: offered, begun by the
+engine, begun by the user, run to its end, ended early, postponed by a detector,
+postponed by the user, and discharged by a rest already taken. Each row carries
+the detector's reason where there was one and the span of time it is about where
+one applies — nullable, because a break of no length and an event that was never
+about length are different rows.
+
 Verified end to end, not only by tests: the real application, on the real
 default schedule, took a real twenty-second break, and the four rows it wrote
-were read back out of the file by a separate process.
+were read back out of the file by a separate process. Repeated for the v2
+schema, on the same file: the v1 database left behind by that first run was
+upgraded in place, its four rows survived with NULL durations, and the break
+taken afterwards recorded a duration of 20.0.
 
 **Stage 2 — settings**, moving the theme out of the registry and adding the
 schedule and detector tables. **Stage 3 — daily metrics** and the Statistics

@@ -750,6 +750,14 @@ that decides they are survivable. Its `except` is deliberately broad: a journal
 is a protocol, and an implementation failing in an unanticipated way still must
 not be able to stop the timer.
 
+Proven against a file the process genuinely cannot write to, not against a
+stand-in that raises on cue: a test makes a real database read-only, opens it —
+which still succeeds, because history that cannot be added to is still worth
+reading — and runs a whole break through the real `EventStore` behind the real
+presenter. The break starts, finishes and counts; nothing reaches the file; the
+warning is logged. A stand-in proves the presenter survives what the test
+author imagined, and that is a weaker claim.
+
 The same rule at start-up. `open_history()` logs and returns a `NullJournal`
 rather than refusing to launch: everything the product actually does works with
 no database at all, and a start-up error about SQLite on a machine where the
@@ -769,6 +777,37 @@ launch, which exists because STARTED and STOPPED cannot delimit a run that
 ended in a crash, and two runs merged into one would be history that never
 happened. It says which launch a row belongs to and nothing else.
 
+### Every break event, told apart
+
+The log keeps the distinctions the product makes rather than the ones a
+dashboard happens to show. A break offered, begun by the engine, begun by the
+user, run to its end, ended early, postponed by a detector, postponed by the
+user, and discharged by a rest the user had already taken are eight kinds, not
+three. `BREAK_SKIPPED` is the newest of them: the presenter counts it exactly
+as `BREAK_COMPLETED` and the event list says "Break finished" for both, because
+skipping says nothing about having skipped and a list that commented on it
+would be a list with an opinion. The difference is a fact, so it is kept where
+facts are kept.
+
+`detail` carries the detector's reason where there was one, and nothing where
+nothing had to be explained.
+
+`duration` carries the span the event is about, in seconds, and is NULL where
+no span applies. Nullable rather than defaulted to zero on purpose: a break
+skipped the instant it began lasted no time, a session being paused was never
+about time at all, and those two must not read the same. Which span it is
+depends on the kind — the stretch at the screen that earned an offer, how long
+a break lasted, how long a postponement runs for, how long the external rest
+was — and in each case it is read from the timer rather than assumed from the
+schedule, so a detector's own retry deadline or a focus block stretched by a
+deferral lands as the number it really was.
+
+A break that ran its course records exactly the scheduled duration, because the
+snapshot clamps at zero remaining. That is deliberate: a pulse arriving half a
+second after the twenty seconds are up is latency in the timer that observed
+the break, not extra break. The number nobody scheduled only appears on a break
+ended early, which is the one worth reading.
+
 **No user identifier, ever.** Not a UUID, not a machine ID, not a hashed one.
 `test_no_table_carries_anything_that_could_identify_anyone` migrates a real
 file, reads its actual `PRAGMA table_info`, and fails on any column name
@@ -777,12 +816,38 @@ schema that exists rather than against the one that was intended.
 
 ### Migrations
 
-`PRAGMA user_version`, not a table of our own: one integer in the file header,
-written inside the same transaction as the DDL it describes, so it cannot get
-out of step with the schema it claims to describe. Migrations are a tuple in a
-module rather than a directory of numbered files — at this size the whole
-history fits on one screen, and a step that cannot be read next to the one
-before it is a step nobody will check.
+`PRAGMA user_version` is the marker: one integer in the file header, written
+inside the same transaction as the DDL it describes, so it cannot get out of
+step with the schema it claims to describe. Migrations are a tuple in a module
+rather than a directory of numbered files — at this size the whole history fits
+on one screen, and a step that cannot be read next to the one before it is a
+step nobody will check.
+
+The `schema_version` table beside it is a **ledger, not a second marker**: one
+row per version applied, with the time it was applied. It answers what the
+pragma cannot — *when did this file become a v2* — which is the first thing
+worth knowing when one tester's database behaves unlike everybody else's, and
+it is readable with the same `sqlite3` command as everything else. `migrate()`
+reads the pragma and never the ledger, so the two cannot disagree about what
+the schema *is*; a ledger that has been truncated or dropped cannot make a v2
+file migrate itself twice. There is a test that deletes every row in it and
+asserts exactly that.
+
+The ledger is created outside the migration list rather than by a step in it,
+because the first step has to be able to record itself — including on a file
+being created from nothing. `applied_at` is NULL for a version reached before
+the ledger existed, which is every database the first release wrote. When is
+not recoverable for those, and inventing a timestamp would make the column
+worthless for the ones that are real.
+
+**v1 → v2** adds `events.duration`. It exists partly to carry the number and
+partly because P5 will change this schema and an upgrade path first exercised
+when it is needed is an upgrade path nobody has run. A test builds a real v1
+file — by running the shipped migration with the version pinned, not by
+hand-copying its DDL into the test, and then dropping the ledger the first
+release did not have — upgrades it, and asserts the rows are still there with
+NULL in the new column. Not zero: nobody measured those breaks, and a
+backfilled zero would be a measurement nobody took.
 
 A step that fails rolls back with the version untouched. A half-applied
 migration carrying a version that claims otherwise is a database that fails the

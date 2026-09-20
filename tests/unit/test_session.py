@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 
-from ocura.application.session import BreakSession, SessionEventKind
+from ocura.application.session import BreakSession, SessionEvent, SessionEventKind
 from ocura.domain.context import Deferral, RestSatisfied
 from ocura.domain.errors import TransitionError
 from ocura.domain.schedule import BreakSchedule
@@ -195,7 +195,12 @@ def test_skip_break_ends_it_early_and_resets_focus(
     assert session.state is TimerState.ON_BREAK
 
     clock.advance(schedule.break_duration / 3)
-    assert session.skip_break().kind is SessionEventKind.BREAK_COMPLETED
+    event = session.skip_break()
+    # Not BREAK_COMPLETED. A break the user ended after a third of it is a
+    # different fact from one that ran out, and the log is the one place that
+    # difference is kept — see the note on the kind itself.
+    assert event.kind is SessionEventKind.BREAK_SKIPPED
+    assert event.duration == schedule.break_duration / 3
     assert session.state is TimerState.FOCUSING
     assert session.snapshot().focus_elapsed == 0.0
 
@@ -215,3 +220,157 @@ def test_pause_and_resume_emit_events(session: BreakSession, clock: FakeMonotoni
     assert session.tick() == []
     assert session.resume().kind is SessionEventKind.RESUMED
     assert session.snapshot().focus_elapsed == 120.0
+
+
+# --- durations -------------------------------------------------------------
+#
+# Every event about a span of time carries that span, because the questions the
+# testers' feedback will raise are all of the form "how long". A kind with no
+# duration attached is a row that can be counted and not measured.
+
+
+def only(events: list[SessionEvent], kind: SessionEventKind) -> SessionEvent:
+    matching = [event for event in events if event.kind is kind]
+    assert len(matching) == 1, f"expected exactly one {kind}, got {[e.kind for e in events]}"
+    return matching[0]
+
+
+def test_an_offer_carries_the_stretch_at_the_screen_that_earned_it(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    session.start()
+    clock.advance(schedule.focus_interval)
+
+    assert only(session.tick(), SessionEventKind.BREAK_DUE).duration == schedule.focus_interval
+
+
+def test_an_offer_after_a_deferral_carries_the_longer_stretch_it_really_was(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    """The scheduled interval and the time actually spent at the screen differ
+    the moment anything postpones a break, and the second one is the fact."""
+    context.queue.append(Deferral(reason="a call is running", retry_after=None))
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+    assert session.state is TimerState.DEFERRED
+
+    clock.advance(schedule.defer_interval)
+    offered = only(session.tick(), SessionEventKind.BREAK_DUE)
+
+    assert offered.duration == schedule.focus_interval + schedule.defer_interval
+
+
+def test_a_break_that_ran_out_carries_how_long_it_lasted(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+
+    clock.advance(schedule.break_duration)
+    completed = only(session.tick(), SessionEventKind.BREAK_COMPLETED)
+
+    assert completed.duration == schedule.break_duration
+
+
+def test_a_break_ended_early_carries_the_shorter_time_it_actually_lasted(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    """The number the whole distinction exists for: a twenty-second break that
+    was three seconds long is not a twenty-second break."""
+    session.start()
+    clock.advance(schedule.focus_interval)
+    session.tick()
+
+    clock.advance(3.0)
+    skipped = session.skip_break()
+
+    assert skipped.kind is SessionEventKind.BREAK_SKIPPED
+    assert skipped.duration == 3.0
+
+
+def test_a_deferral_carries_how_long_it_postpones_the_break_for(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    context.queue.append(Deferral(reason="a call is running", retry_after=None))
+    session.start()
+    clock.advance(schedule.focus_interval)
+
+    deferred = only(session.tick(), SessionEventKind.BREAK_DEFERRED)
+    assert deferred.duration == schedule.defer_interval
+    assert deferred.detail == "a call is running"
+
+
+def test_a_detector_that_names_its_own_retry_is_the_duration_recorded(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    """Read off the timer rather than off the schedule, so an override lands."""
+    context.queue.append(Deferral(reason="presenting", retry_after=90.0))
+    session.start()
+    clock.advance(schedule.focus_interval)
+
+    assert only(session.tick(), SessionEventKind.BREAK_DEFERRED).duration == 90.0
+
+
+def test_a_snooze_carries_the_snooze_interval(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    session.start()
+    clock.advance(schedule.focus_interval - schedule.pre_break_warning)
+    session.tick()
+
+    snoozed = session.snooze()
+    assert snoozed.kind is SessionEventKind.BREAK_SNOOZED
+    assert snoozed.duration == schedule.snooze_interval
+
+
+def test_a_rest_that_discharged_a_break_carries_how_long_the_rest_was(
+    session: BreakSession,
+    clock: FakeMonotonicClock,
+    context: ScriptedContext,
+    schedule: BreakSchedule,
+):
+    rested_for = schedule.break_duration * 4
+    context.queue.append(RestSatisfied(reason="the session was locked", rested_for=rested_for))
+    session.start()
+    clock.advance(schedule.focus_interval)
+
+    satisfied = only(session.tick(), SessionEventKind.BREAK_SATISFIED)
+    assert satisfied.duration == rested_for
+    assert satisfied.detail == "the session was locked"
+
+
+def test_events_that_are_not_about_a_span_of_time_carry_no_duration(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    """None, not zero. Nothing was measured, which is not a measurement of nothing."""
+    assert session.start().duration is None
+    clock.advance(schedule.focus_interval)
+    session.tick()
+
+    assert session.state is TimerState.ON_BREAK
+    assert session.pause().duration is None
+    assert session.resume().duration is None
+    assert session.stop().duration is None
+
+
+def test_a_user_initiated_break_is_its_own_kind_and_starts_unmeasured(
+    session: BreakSession, clock: FakeMonotonicClock, schedule: BreakSchedule
+):
+    """A break that has just begun has no duration yet; the one that ends it does."""
+    session.start()
+    clock.advance(60.0)
+
+    started = session.take_break_now()
+    assert started.kind is SessionEventKind.BREAK_STARTED_BY_USER
+    assert started.duration is None
