@@ -31,6 +31,7 @@ from ocura.infrastructure.storage.schema import (
     migration_log,
     schema_version,
 )
+from ocura.infrastructure.storage.statistics import StatisticsStore, normalise_reason
 
 #: The connection type, re-exported so that callers above this package can name
 #: one without importing sqlite3 — which the domain, the application layer and
@@ -44,6 +45,7 @@ __all__ = [
     "Connection",
     "EventStore",
     "FutureSchemaError",
+    "StatisticsStore",
     "StorageError",
     "StoredEvent",
     "close_database",
@@ -51,6 +53,7 @@ __all__ = [
     "migrate",
     "migration_log",
     "next_run",
+    "normalise_reason",
     "open_database",
     "open_event_store",
     "schema_version",
