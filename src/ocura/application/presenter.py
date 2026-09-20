@@ -318,7 +318,12 @@ class BreakPresenter:
                     self._waiting_reason = event.detail or None
                 case SessionEventKind.BREAK_SNOOZED:
                     self._waiting_reason = "postponed"
-                case SessionEventKind.BREAK_COMPLETED:
+                # A break ended early is still a break that happened, and the
+                # count means "breaks that happened". The two kinds diverge in
+                # the log, which is where the difference is a fact worth
+                # keeping, and nowhere on screen, which is where it would read
+                # as a judgement.
+                case SessionEventKind.BREAK_COMPLETED | SessionEventKind.BREAK_SKIPPED:
                     self._breaks_taken += 1
                     self._waiting_reason = None
                 case SessionEventKind.BREAK_SATISFIED:
@@ -343,7 +348,11 @@ class BreakPresenter:
                 return "Session started"
             case SessionEventKind.BREAK_STARTED | SessionEventKind.BREAK_STARTED_BY_USER:
                 return "Break started"
-            case SessionEventKind.BREAK_COMPLETED:
+            case SessionEventKind.BREAK_COMPLETED | SessionEventKind.BREAK_SKIPPED:
+                # Deliberately the same sentence for both. Ocura does not force
+                # breaks, and a list that announced a shorter one differently
+                # would be commenting on a choice it has no business having an
+                # opinion about.
                 return "Break finished"
             case SessionEventKind.BREAK_DEFERRED:
                 return f"Waiting — {event.detail}" if event.detail else "Waiting for a good moment"
