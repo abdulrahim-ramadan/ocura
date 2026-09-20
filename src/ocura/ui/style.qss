@@ -256,6 +256,62 @@ QLabel {{
     color: {text_faint};
 }}
 
+/* --- first run ---------------------------------------------------------- */
+
+#Onboarding {{
+    background: {bg};
+}}
+
+#OnboardingStep {{
+    color: {text_faint};
+    font-size: {font_size_s};
+}}
+
+#OnboardingTitle {{
+    color: {text};
+    font-size: {font_size_xl};
+}}
+
+/* The one long paragraph in the product, so it is set at reading size rather
+   than at the muted size the rest of the explanatory text uses. */
+#OnboardingBody {{
+    color: {text};
+    font-size: {font_size_l};
+}}
+
+#OnboardingNote {{
+    color: {text_muted};
+    font-size: {font_size_m};
+}}
+
+#OnboardingChoice {{
+    color: {text};
+    font-size: {font_size_m};
+    padding: {space_xs} 0;
+    spacing: {space_s};
+}}
+
+#OnboardingChoice::indicator {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    border-radius: 9px;
+    height: 16px;
+    width: 16px;
+}}
+
+#OnboardingChoice::indicator:hover {{
+    border-color: {accent};
+}}
+
+/* A filled ring. The radius is measured on the OUTER edge, so a 16px
+   indicator inside a 4px border is a 24px box and needs 12px to be round —
+   restating the unchecked 9px here is what first drew a rounded square. */
+#OnboardingChoice::indicator:checked {{
+    background: {accent};
+    border: 4px solid {surface_raised};
+    border-radius: 12px;
+}}
+
 /* --- controls --------------------------------------------------------- */
 
 QPushButton {{

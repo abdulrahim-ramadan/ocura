@@ -9,8 +9,9 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
-from ocura.application.autostart import Autostart, NoAutostart
+from ocura.application.autostart import Autostart, AutostartUnavailable, NoAutostart
 from ocura.application.journal import NullJournal, SessionJournal
+from ocura.application.onboarding import Onboarding, needs_introduction
 from ocura.application.presenter import BreakPresenter, SessionView
 from ocura.application.settings import (
     MemorySettings,
@@ -40,6 +41,7 @@ from ocura.ui import motion
 from ocura.ui.driver import TickDriver
 from ocura.ui.main_window import MainWindow
 from ocura.ui.motion import Motion
+from ocura.ui.onboarding import OnboardingDialog
 from ocura.ui.overlay import OverlayManager
 from ocura.ui.resources import app_icon
 from ocura.ui.single_instance import SingleInstance
@@ -320,12 +322,43 @@ class OcuraApp:
         self.toast.hide()
         self.driver.snooze()
 
-    def start(self) -> None:
+    def start(self, first_run: bool = False) -> None:
+        """Introduce Ocura if it has not been, then run.
+
+        The introduction comes first and blocks, so the window behind it opens
+        already configured rather than rearranging itself under the user the
+        moment they finish reading. Nothing is timed while it is up: a focus
+        block that started before they had been told what a focus block is
+        would be the product interrupting the explanation of why it interrupts.
+        """
+        if needs_introduction(self.preferences, first_run):
+            self.introduce()
+
         # Before the window: the tray is how Ocura is reached once the window is
         # hidden, so it must exist even if the window never appears.
         self.tray.show()
         self.window.show_and_raise()
         self.driver.start()
+
+    def introduce(self) -> None:
+        """Run the three first-run screens and apply what they produced."""
+        dialog = OnboardingDialog(Onboarding(self.preferences))
+        dialog.completed.connect(self._on_introduced)
+        dialog.exec()
+
+    def _on_introduced(self, preferences: Settings) -> None:
+        # The startup entry is written here rather than inside the flow: the
+        # flow records an answer, and the only place that touches the registry
+        # is the one that can report a refusal to the user later, in Settings.
+        if preferences.autostart:
+            try:
+                self.autostart.set_enabled(True)
+            except AutostartUnavailable as exc:
+                logger.warning("could not add the startup entry: %s", exc)
+                preferences = preferences.replace(autostart=False)
+
+        self.apply_preferences(preferences)
+        self.window.settings.load(preferences)
 
     def quit(self) -> None:
         # Stop first: stopping emits a STOPPED event, and that event is part of
@@ -399,6 +432,12 @@ def main(argv: list[str] | None = None) -> int:
     if "--self-check" in arguments:
         return self_check()
 
+    # A flag rather than a button. Re-running the introduction is something
+    # developers and testers need and users do not, and a "show me the welcome
+    # again" control in Settings would be clutter that earns its place once per
+    # install.
+    first_run = "--first-run" in arguments
+
     # Per-monitor DPI: PassThrough keeps fractional scales such as 150% exact
     # instead of rounding them to whole factors and blurring everything.
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -416,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ocura = OcuraApp(app)
     guard.raiseRequested.connect(ocura.window.show_and_raise)
-    ocura.start()
+    ocura.start(first_run=first_run)
     return app.exec()
 
 
