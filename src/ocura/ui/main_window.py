@@ -12,12 +12,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ocura.application.autostart import Autostart
 from ocura.application.presenter import SessionView
+from ocura.application.settings import Settings
 from ocura.application.statistics import StatisticsPresenter
 from ocura.ui.motion import MOTION
+from ocura.ui.settings_page import SettingsPage
 from ocura.ui.statistics import StatisticsPage
 from ocura.ui.theme import LAYOUT, SPACING
-from ocura.ui.views import DashboardView, PlaceholderView
+from ocura.ui.views import DashboardView
 
 DEFAULT_SIZE = QSize(880, 660)
 
@@ -37,12 +40,15 @@ class MainWindow(QMainWindow):
     #: constant rather than a literal in each: they have to agree, and a pair
     #: of bare 1s is exactly the kind of agreement that quietly stops holding.
     STATISTICS = 1
+    SETTINGS = 2
 
     def __init__(
         self,
         icon: QIcon,
         settings: QSettings,
         statistics: StatisticsPresenter | None = None,
+        preferences: Settings | None = None,
+        autostart: Autostart | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -57,13 +63,8 @@ class MainWindow(QMainWindow):
         self._pages.addWidget(self.dashboard)
         self.statistics = StatisticsPage(statistics)
         self._pages.addWidget(self.statistics)
-        self._pages.addWidget(
-            PlaceholderView(
-                "Settings",
-                "Coming in P5. Schedule and detector settings will live here once they "
-                "can be saved.",
-            )
-        )
+        self.settings = SettingsPage(preferences, autostart)
+        self._pages.addWidget(self.settings)
 
         root = QWidget()
         root.setObjectName("Root")
@@ -114,6 +115,14 @@ class MainWindow(QMainWindow):
 
     def set_theme_name(self, name: str) -> None:
         self._theme_button.setText("Light theme" if name == "dark" else "Dark theme")
+        # The footer button is a shortcut to the real setting, which is what
+        # docs/architecture.md said it would become once there was one. The
+        # page stays the single place that decides what a theme change means.
+        self.settings.set_theme(name)
+
+    def show_settings(self) -> None:
+        self._nav.button(self.SETTINGS).setChecked(True)
+        self._show_page(self.SETTINGS)
 
     def _show_page(self, index: int) -> None:
         if index == self._pages.currentIndex():

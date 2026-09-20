@@ -204,33 +204,3 @@ class DashboardView(QWidget):
             for line in view.events:
                 self._events.addItem(f"{line.time_text}   {line.text}")
             self._events.scrollToBottom()
-
-
-class PlaceholderView(QWidget):
-    """An honest empty section. No invented numbers, no sample data."""
-
-    def __init__(self, title: str, promise: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-
-        card = _card()
-        card.setMaximumWidth(LAYOUT.content_max_width)
-        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
-        card_layout.setSpacing(SPACING.sm)
-        card_layout.addWidget(_label(title, "Headline"))
-        card_layout.addWidget(_label(promise, "Placeholder"))
-
-        # The card needs a real width before a wrapped label can report the height
-        # it needs, so give it a row of its own rather than an alignment flag.
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(card, 1)
-        row.addStretch(0)
-
-        # An empty section is centred rather than pinned to the top of a void.
-        root = QVBoxLayout(self)
-        root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
-        root.addStretch(1)
-        root.addLayout(row)
-        root.addStretch(1)

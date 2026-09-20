@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QProgressBar
 
-from ocura.ui.app import THEME_KEY, initial_theme
+from ocura.ui.app import system_theme
 from ocura.ui.main_window import MainWindow
 from ocura.ui.motion import FADE_MS, Motion
 from ocura.ui.resources import APP_ICON, ICON_SIZES, app_icon
@@ -47,41 +47,25 @@ def test_the_theme_toggle_switches_and_persists(qtbot, icon, settings):
         window._theme_button.click()
 
 
-def test_the_toggle_button_lives_in_the_sidebar_not_in_settings(qtbot, icon, settings):
+def test_the_sidebar_button_stays_and_settings_now_owns_the_choice(qtbot, icon, settings):
+    """P5 was always going to make the footer button a shortcut to the real
+    setting rather than a second place that decides what a theme is."""
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
 
-    sidebar = window._theme_button.parent()
-    assert sidebar.objectName() == "Sidebar"
-    for index in (1, 2):
-        page_text = " ".join(
-            child.text()
-            for child in window._pages.widget(index).findChildren(type(window._theme_button))
-        )
-        assert "theme" not in page_text.lower()
+    assert window._theme_button.parent().objectName() == "Sidebar"
+    window.set_theme_name(LIGHT.name)
+    assert window.settings._theme.currentData() == LIGHT.name
 
 
-def test_a_remembered_theme_wins_over_the_system(tmp_path):
-    settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
-    settings.setValue(THEME_KEY, LIGHT.name)
-    assert initial_theme(settings) == LIGHT.name
-
-
-def test_an_unknown_stored_theme_is_ignored(tmp_path, qapp):
-    settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
-    settings.setValue(THEME_KEY, "chartreuse")
-    assert initial_theme(settings) in (DARK.name, LIGHT.name)
-
-
-def test_first_run_follows_the_system_or_falls_back_to_dark(tmp_path, qapp):
-    settings = QSettings(str(tmp_path / "s.ini"), QSettings.Format.IniFormat)
+def test_the_system_theme_is_one_ocura_has(qapp):
+    """Consulted only for someone who has never chosen; a stored choice wins,
+    which is settled in the settings model and tested there."""
     scheme = qapp.styleHints().colorScheme()
 
-    chosen = initial_theme(settings)
+    chosen = system_theme()
     if scheme == Qt.ColorScheme.Light:
         assert chosen == LIGHT.name
-    elif scheme == Qt.ColorScheme.Dark:
-        assert chosen == DARK.name
     else:
         assert chosen == DARK.name
 

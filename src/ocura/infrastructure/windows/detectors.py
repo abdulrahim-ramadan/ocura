@@ -47,6 +47,18 @@ class IdleDetector:
         self._threshold = threshold
         self._retry_after = retry_after
 
+    @property
+    def threshold(self) -> float:
+        return self._threshold
+
+    def set_threshold(self, seconds: float) -> None:
+        """Adopt a new threshold. Takes effect at the next assessment.
+
+        Nothing to reconcile: this detector holds no accumulated state, it
+        asks Windows how long the input has been quiet every time it is asked.
+        """
+        self._threshold = seconds
+
     def assess(self, snapshot: TimerSnapshot) -> ContextAssessment:
         idle = self._idle_seconds()
         if idle >= self._threshold:

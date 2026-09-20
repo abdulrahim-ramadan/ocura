@@ -170,6 +170,92 @@ QLabel {{
     font-size: {font_size_m};
 }}
 
+/* --- settings --------------------------------------------------------- */
+
+#SettingTitle {{
+    color: {text};
+    font-size: {font_size_m};
+}}
+
+#SettingNote {{
+    color: {text_muted};
+    font-size: {font_size_s};
+}}
+
+/* A refused value. Marked the way a waiting note is — an edge and a tint, no
+   alarm colour — because it is a correction, not a fault. The text is at full
+   strength rather than muted: it is the one sentence on the page that has to
+   be read. */
+#SettingProblem {{
+    background: {accent_quiet};
+    border: none;
+    border-left: 2px solid {accent};
+    border-radius: {radius_s};
+    color: {text};
+    font-size: {font_size_s};
+    padding: {space_s} {space_m};
+}}
+
+#SettingSpin, #SettingChoice {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    border-radius: {radius_m};
+    color: {text};
+    min-width: 96px;
+    padding: {space_xs} {space_s};
+}}
+
+/* A checkbox is the control here, so it gets a real box rather than whatever
+   the platform style draws over a dark surface. */
+#SettingToggle::indicator {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    border-radius: {radius_s};
+    height: 16px;
+    width: 16px;
+}}
+
+#SettingToggle::indicator:hover {{
+    border-color: {accent};
+}}
+
+#SettingToggle::indicator:checked {{
+    background: {accent};
+    border-color: {accent};
+}}
+
+#SettingToggle::indicator:disabled {{
+    background: {surface};
+    border-color: {border};
+}}
+
+#SettingSpin:focus, #SettingChoice:focus {{
+    border-color: {accent};
+}}
+
+#SettingChoice::drop-down {{
+    border: none;
+    width: {space_lg};
+}}
+
+#SettingChoice QAbstractItemView {{
+    background: {surface_raised};
+    border: 1px solid {border};
+    color: {text};
+    selection-background-color: {accent_quiet};
+    selection-color: {text};
+}}
+
+#SettingToggle {{
+    color: {text};
+    font-size: {font_size_m};
+    spacing: {space_s};
+}}
+
+#SettingToggle:disabled {{
+    color: {text_faint};
+}}
+
 /* --- controls --------------------------------------------------------- */
 
 QPushButton {{

@@ -207,16 +207,19 @@ def test_navigation_switches_pages(qtbot, icon, settings):
         assert window._pages.currentIndex() == index
 
 
-def test_placeholders_promise_nothing_they_do_not_have(qtbot, icon, settings):
-    """Settings is the only section still a promise. Statistics arrived in P4."""
+def test_no_section_is_a_promise_any_more(qtbot, icon, settings):
+    """Statistics arrived in P4 and Settings in P5, so nothing is still
+    "coming" — and PlaceholderView went with them rather than lingering as a
+    component with no caller."""
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
-    text = " ".join(
-        label.text()
-        for label in window._pages.widget(2).findChildren(type(window.dashboard._headline))
-    )
-    assert "Coming in P5" in text
-    assert "Coming in P4" not in text, "Statistics is built; nothing should still promise it"
+
+    label_type = type(window.dashboard._headline)
+    for index in range(window._pages.count()):
+        text = " ".join(
+            label.text() for label in window._pages.widget(index).findChildren(label_type)
+        )
+        assert "coming in" not in text.lower()
 
 
 def test_tray_tracks_the_view(qtbot, icon):

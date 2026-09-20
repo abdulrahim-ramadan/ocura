@@ -277,9 +277,7 @@ class BreakPresenter:
             # Empty rather than absent when the user has turned them off: the
             # break screen hides a tip it has not been given, and "no tip" is a
             # thing the view can say without a second flag to say it with.
-            tip=(
-                BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)] if self._settings.tips else ""
-            ),
+            tip=(BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)] if self._settings.tips else ""),
         )
 
     def tooltip(self) -> str:

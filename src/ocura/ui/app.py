@@ -2,30 +2,39 @@ from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
+from ocura.application.autostart import Autostart, NoAutostart
 from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.presenter import BreakPresenter, SessionView
+from ocura.application.settings import (
+    MemorySettings,
+    Settings,
+    SettingsRepository,
+    migrate_from_shell,
+)
 from ocura.application.statistics import (
     NullStatistics,
     StatisticsPresenter,
     StatisticsSource,
 )
-from ocura.domain.schedule import DEFAULT_SCHEDULE, BreakSchedule
 from ocura.infrastructure.clock import SystemMonotonicClock, SystemWallClock
 from ocura.infrastructure.storage import (
     Connection,
     EventStore,
+    SettingsStore,
     StatisticsStore,
     StorageError,
     close_database,
     default_database_path,
     open_event_store,
 )
+from ocura.infrastructure.windows.autostart import build_autostart, startup_command
 from ocura.infrastructure.windows.context import build_windows_context
 from ocura.ui import motion
 from ocura.ui.driver import TickDriver
@@ -43,14 +52,39 @@ logger = logging.getLogger(__name__)
 ORGANISATION = "Ocura"
 APPLICATION = "Ocura"
 
-#: Shell state, kept apart from anything a user would call a setting. P5 moves
-#: the theme into the real settings model; window geometry stays here.
-THEME_KEY = "shell/theme"
+
+class _ShellKeys:
+    """QSettings, narrowed to the three calls `migrate_from_shell` needs.
+
+    The migration itself is in the application layer and knows nothing about
+    Qt, which is what lets it be tested without one — a one-way door is exactly
+    the thing worth being sure fires once and leaves nothing behind.
+    """
+
+    def __init__(self, settings: QSettings) -> None:
+        self._settings = settings
+
+    def value(self, key: str) -> object:
+        return self._settings.value(key)
+
+    def remove(self, key: str) -> None:
+        self._settings.remove(key)
+
+    def contains(self, key: str) -> bool:
+        return self._settings.contains(key)
 
 
-def open_history(
-    path: Path | None = None,
-) -> tuple[Connection | None, SessionJournal, StatisticsSource]:
+@dataclass(frozen=True, slots=True)
+class History:
+    """Everything that comes out of the one database file, or its stand-ins."""
+
+    connection: Connection | None
+    journal: SessionJournal
+    statistics: StatisticsSource
+    settings: SettingsRepository
+
+
+def open_history(path: Path | None = None) -> History:
     """Open the history database, or carry on without one and say so.
 
     Ocura does not fail to start because a disk did. Everything the product
@@ -64,21 +98,38 @@ def open_history(
         connection, store = open_event_store(path)
     except StorageError as exc:
         logger.warning("history is unavailable, continuing without it: %s", exc)
-        # Both seams, not just the journal: a statistics page with nothing
+        # Every seam, not just the journal: a statistics page with nothing
         # behind it says there is nothing to show, which is true, rather than
-        # failing to open.
-        return None, NullJournal(), NullStatistics()
+        # failing to open, and settings that cannot be saved still apply to
+        # the session the user is in.
+        return History(None, NullJournal(), NullStatistics(), MemorySettings())
 
     logger.info("history at %s, run %d", path or default_database_path(), store.run)
-    return connection, store, StatisticsStore(connection)
+    return History(connection, store, StatisticsStore(connection), SettingsStore(connection))
 
 
-def initial_theme(settings: QSettings) -> str:
-    """Remembered choice, else the system's, else dark."""
-    stored = settings.value(THEME_KEY)
-    if isinstance(stored, str) and stored in THEMES:
-        return stored
+def _autostart() -> Autostart:
+    """The real one, or a stand-in that says it cannot help.
 
+    `winreg` exists only on Windows and `build_autostart` binds it on the way
+    in. Ocura is a Windows application, but it is imported by tests and tools
+    that are not, and a start-up preference is not worth an import error at
+    launch.
+    """
+    try:
+        return build_autostart()
+    except (ImportError, OSError) as exc:
+        logger.warning("startup entries are unavailable here: %s", exc)
+        return NoAutostart()
+
+
+def system_theme() -> str:
+    """What Windows is set to, else dark.
+
+    Only consulted for someone who has never chosen. Once there is a stored
+    preference it wins, because a person who picked light did so knowing what
+    their system was set to.
+    """
     hints = QGuiApplication.styleHints()
     scheme = getattr(hints, "colorScheme", None)
     if scheme is not None:
@@ -98,28 +149,45 @@ class OcuraApp:
     def __init__(
         self,
         app: QApplication,
-        schedule: BreakSchedule = DEFAULT_SCHEDULE,
         settings: QSettings | None = None,
+        autostart: Autostart | None = None,
     ) -> None:
         self._app = app
-        self._schedule = schedule
+        #: Shell state only, now that P5 has moved the preferences out: window
+        #: geometry, and nothing a user would call a setting.
         self._settings = settings or QSettings(ORGANISATION, APPLICATION)
 
         monotonic = SystemMonotonicClock()
-        self._database, self.journal, statistics = open_history()
+        self._history = open_history()
+        self._database = self._history.connection
+        self.journal = self._history.journal
+        self.autostart = autostart or _autostart()
+        self.preferences = self._load_preferences()
+        self._schedule = schedule = self.preferences.schedule()
+
+        self._context = build_windows_context(
+            monotonic, idle_threshold=self.preferences.idle_threshold
+        )
         presenter = BreakPresenter(
             schedule,
             monotonic,
             SystemWallClock(),
-            build_windows_context(monotonic),
+            self._context,
             journal=self.journal,
+            settings=self.preferences,
         )
 
         motion.configure(Motion.from_system())
 
         icon = app_icon()
         self.driver = TickDriver(presenter, app)
-        self.window = MainWindow(icon, self._settings, StatisticsPresenter(statistics, schedule))
+        self.window = MainWindow(
+            icon,
+            self._settings,
+            StatisticsPresenter(self._history.statistics, schedule),
+            self.preferences,
+            self.autostart,
+        )
         self.tray = Tray(icon, app)
         self.toast = BreakToast()
         self.overlay = OverlayManager()
@@ -128,8 +196,8 @@ class OcuraApp:
         # Closing the last window must not end the process: the tray is the app.
         app.setQuitOnLastWindowClosed(False)
 
-        self._theme_name = initial_theme(self._settings)
-        self._apply_theme(self._theme_name)
+        self._theme_name = ""
+        self._apply_theme(self.preferences.theme)
 
         self._connect()
 
@@ -140,6 +208,7 @@ class OcuraApp:
         self.window.dashboard.pauseToggled.connect(self.driver.toggle_paused)
         self.window.dashboard.breakRequested.connect(self.driver.take_break_now)
         self.window.themeToggled.connect(self.toggle_theme)
+        self.window.settings.settingsChanged.connect(self.apply_preferences)
 
         self.tray.openRequested.connect(self.window.show_and_raise)
         self.tray.pauseToggled.connect(self.driver.toggle_paused)
@@ -151,20 +220,76 @@ class OcuraApp:
         self.overlay.skipRequested.connect(self.driver.skip_break)
         self.overlay.snoozeRequested.connect(self.driver.snooze)
 
-    # --- theme --------------------------------------------------------------
+    # --- preferences ---------------------------------------------------------
+
+    def _load_preferences(self) -> Settings:
+        """Read them, carry the theme out of the shell namespace, save if it moved."""
+        try:
+            preferences = self._history.settings.load()
+        except StorageError as exc:
+            logger.warning("settings could not be read, using the defaults: %s", exc)
+            preferences = MemorySettings().load()
+
+        preferences, moved = migrate_from_shell(preferences, _ShellKeys(self._settings))
+        if moved:
+            logger.info("moved the theme out of the shell namespace into settings")
+        elif not preferences.introduced:
+            # Nobody has ever chosen, so follow the system rather than imposing
+            # a default that fights it.
+            preferences = preferences.replace(theme=system_theme())
+
+        if moved:
+            self._save_preferences(preferences)
+        return preferences
+
+    def apply_preferences(self, preferences: Settings) -> None:
+        """Save, then apply to everything already running. Order matters.
+
+        Saving first means a change survives a crash in whatever it is about to
+        reconfigure. Nothing below can refuse: a `Settings` that exists has
+        already been validated, which is the point of validating at the
+        boundary rather than here.
+        """
+        self._save_preferences(preferences)
+        self.preferences = preferences
+
+        self._schedule = preferences.schedule()
+        self.driver.presenter.apply(preferences)
+        self._context.set_idle_threshold(preferences.idle_threshold)
+        self._apply_theme(preferences.theme)
+        # The change is visible at once rather than at the next tick, which for
+        # a twenty-minute interval would be a second of a control looking dead.
+        self.driver.refresh()
+
+    def _save_preferences(self, preferences: Settings) -> None:
+        try:
+            self._history.settings.save(preferences)
+        except StorageError as exc:
+            # The same bargain as the event log: a disk that cannot be written
+            # costs the user their stored choice and never their ability to
+            # make one. It applies to this session either way.
+            logger.warning("settings could not be saved: %s", exc)
+
+    # --- theme ---------------------------------------------------------------
 
     @property
     def theme_name(self) -> str:
         return self._theme_name
 
     def toggle_theme(self) -> None:
-        self._apply_theme(LIGHT.name if self._theme_name == DARK.name else DARK.name)
+        """The sidebar footer. A shortcut to the setting, not a second owner of it."""
+        self.apply_preferences(
+            self.preferences.replace(
+                theme=LIGHT.name if self._theme_name == DARK.name else DARK.name
+            )
+        )
 
     def _apply_theme(self, name: str) -> None:
+        if name == self._theme_name:
+            return
         self._theme_name = name
         self._app.setStyleSheet(stylesheet(THEMES[name]))
         self.window.set_theme_name(name)
-        self._settings.setValue(THEME_KEY, name)
 
     # --- lifecycle ----------------------------------------------------------
 
@@ -250,12 +375,16 @@ def self_check() -> int:
         # permissions problem under %LOCALAPPDATA% shows up, and the log it
         # would appear in is the one a windowed build does not have.
         lines.append(f"history path: {default_database_path()}")
-        connection, journal, _ = open_history()
-        if isinstance(journal, EventStore):
-            lines.append(f"history: ok, run {journal.run}, {journal.count()} events")
+        history = open_history()
+        if isinstance(history.journal, EventStore):
+            lines.append(
+                f"history: ok, run {history.journal.run}, {history.journal.count()} events"
+            )
         else:
             lines.append("history: UNAVAILABLE (see the warning above)")
-        close_database(connection)
+        lines.append(f"settings: {history.settings.load()}")
+        lines.append(f"autostart command: {startup_command()}")
+        close_database(history.connection)
     finally:
         app.quit()
 
