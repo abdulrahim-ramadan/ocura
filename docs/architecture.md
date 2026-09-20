@@ -507,19 +507,18 @@ a repository around the code, which stops being true the moment P7 packages it.
 `scripts/make_icon.py` regenerates a plain fallback used only if the real icon
 is missing.
 
-### Theme choice, and where it lives for now
+### Theme choice, and where it lives now
 
-The dark/light choice is stored in `QSettings` under `shell/theme`, alongside
-window geometry. Both are shell state rather than user settings, and the theme
-control lives in the sidebar footer rather than in Settings, which is P5 and
-stays honestly empty until it has something real to write into.
-
-**P5 moves the theme into the real settings model** and the sidebar control
-becomes a shortcut to it. The `shell/` namespace exists so that migration is a
-move rather than an excavation.
+P4 kept the dark/light choice in `QSettings` under `shell/theme`, next to
+window geometry, and said the `shell/` namespace existed so that moving it out
+later would be a move rather than an excavation. **P5 made the move.** The
+theme is a setting now; the sidebar footer button is a shortcut to it rather
+than a second place that decides what a theme change means.
 
 On first run, with nothing stored, Ocura follows the system colour scheme via
 `QStyleHints.colorScheme()` and falls back to dark when Qt reports `Unknown`.
+A stored choice always wins: somebody who picked light did so knowing what
+their system was set to.
 
 ## Motion policy
 
@@ -950,6 +949,135 @@ failing when it cannot honour the request, which a network share will do. The
 result is read back and a warning logged if it is not `wal`, and
 `synchronous = NORMAL` is applied only in that case — safe under WAL, where a
 power cut can cost the last transaction but never the integrity of the file.
+
+## P5 — settings and first run
+
+### Settings and shell state are different things
+
+A **setting** is something the user chose and would be annoyed to lose. **Shell
+state** is where a window happened to be. The split is not stylistic: it
+decides what is backed up with their history, what survives reinstalling, and
+what it is acceptable to silently reset.
+
+| | Where | Why |
+|---|---|---|
+| Break interval, break length, warning lead, idle threshold, theme, tips, autostart, introduced | `settings` table in `ocura.db` | Chosen. Belongs with the history, in the one file worth backing up. |
+| Window geometry | `QSettings`, `shell/` namespace | Not chosen. Losing it costs a window in the wrong place for a second. |
+
+P4 put the theme in `shell/theme` deliberately, so that P5 would have a
+namespace to move rather than a registry to excavate.
+`application.settings.migrate_from_shell` is that move: it carries the theme
+across once, removes the old key on the way so a later launch cannot resurrect
+a stale choice over one made since, and never fires again. It takes a
+`ShellNamespace` protocol rather than a `QSettings`, which is what lets a
+one-way door be tested without a Qt application.
+
+### Settings are name/value rows, not a column each
+
+P6 will add preferences, and each one should be a row rather than a migration.
+The type safety a column set would buy is bought instead by `Settings`, which
+every reader goes through and which refuses a value it cannot honour. A row
+written by a newer Ocura that this build has never heard of is left alone
+rather than dropped: saving must not quietly delete another build's settings.
+
+A value that cannot be parsed falls back to its default and is logged. That is
+not the no-clamping rule bending — nobody typed a half-written row — and
+refusing to start would leave the user with no way back into the application
+that owns the file.
+
+### Validation refuses; it never repairs
+
+**Nothing the user typed is silently clamped.** A number is accepted or refused
+with a reason. Rounding 5 to 60 tells them their configuration is something it
+is not, and they find out when a break arrives at the wrong time.
+
+The spin boxes on the Settings page are given ranges far wider than anything
+Ocura accepts, so Qt never clamps first; `Settings.validate()` does the
+refusing, with a sentence beside the control that caused it. **A refused value
+is not reverted either** — the box keeps what was typed and the previous
+setting stays in force, because snapping back throws away the edit and leaves
+the user retyping to discover what else is wrong with it.
+
+`InvalidSettings` subclasses the domain's `ConfigurationError`, because that is
+what already gets raised for exactly these conditions and a parallel hierarchy
+would mean two things to catch. What it adds is the field, so a page can place
+the message, and wording a person can act on: the domain's own message names
+internal fields and compares raw seconds, which is right for a log and wrong
+beside a spin box. The domain call stays as the backstop, so a rule added to
+`BreakSchedule` later cannot slip through unenforced.
+
+`defer_interval` and `snooze_interval` are **derived, not configured**. Both
+must be shorter than the focus interval or the domain refuses the schedule
+outright, and somebody who sets a five-minute rhythm should get a working one
+rather than an error about two fields no screen has ever shown them. Deriving
+is not clamping: nobody typed these.
+
+### Changing the schedule mid-block keeps the elapsed time
+
+`BreakTimer.reschedule` adopts a new schedule without touching a stopwatch.
+**The elapsed focus time is kept and measured against the new interval.** Both
+alternatives are worse: restarting the block erases work the user really did at
+the screen, and waiting a fresh interval from now counts the same stretch
+twice.
+
+The consequence is deliberate. Shortening the interval below what has already
+accrued makes a break due on the next tick — which is the honest answer to
+"remind me every fifteen minutes" from somebody who has been sitting there for
+twenty, not a glitch. `reschedule` itself transitions nothing; `tick()` notices
+what the new numbers have made true, which keeps every state change in the one
+place that has always owned them.
+
+The idle detector is **retuned in place** rather than rebuilt. The session-lock
+detector in the same chain carries a ledger of rest observed since launch, and
+replacing the chain to change an unrelated number would lose the user credit
+for a lock they are in the middle of.
+
+### Autostart is a port, and the registry is the truth
+
+`HKEY_CURRENT_USER\...\Run`, never `HKEY_LOCAL_MACHINE`: the per-user key needs
+no elevation and starts Ocura only for the person who asked. Not a scheduled
+task either — heavier privilege, heavier uninstall, and less visible than a
+registry value the user can see and remove in Task Manager's Startup tab, where
+they will look for it.
+
+The setting records what was asked for; the registry records what will happen.
+They can disagree — another startup manager, a policy, a copied profile — and
+the checkbox shows the registry, because that is what runs at sign-in. A write
+Windows refuses puts the control back and says so, rather than showing a
+promise the machine has not made.
+
+### First run: three screens, and no splash
+
+**There is no splash screen.** Ocura starts in well under two seconds, and
+spending some of that on a logo would be a product built on respecting people's
+time using it to look busy. The effort went into the three first-run screens,
+which is where the explanation now lives — not a tour with callouts over a
+window nobody has looked at yet, and not a manual nobody opens.
+
+The screens are: what Ocura does and that it makes no medical claims; a rhythm,
+with where 20-20-20 comes from; and whether to start with Windows, asked rather
+than assumed. The flow holds a `Settings` throughout rather than loose answers,
+so quitting halfway writes nothing — `introduced` is set by `finish()` and
+nowhere else, and that flag is the whole of "never again".
+
+It blocks before the window opens and before the timer starts. A focus block
+that began before the user had been told what a focus block is would be the
+product interrupting the explanation of why it interrupts.
+
+Seeing it again is `--first-run`, not a button. Re-running the introduction is
+something developers and testers need and users do not, and a "show me the
+welcome again" control in Settings would be clutter that earns its place once
+per install.
+
+### Claims are sourced
+
+`docs/EVIDENCE.md` lists every claim Ocura puts on a screen with who makes it
+and how strong it is — including that 20-20-20 is widely recommended and
+sparsely trialled, which is why the rhythm screen says it is "an easy rhythm to
+remember rather than a result from a trial". The file is not named on screen: a
+user has an application, not a checkout, and a path they cannot open is not an
+attribution. The organisations are named instead, which is the part that can
+actually be followed up.
 
 ## Known limitation: fullscreen on a non-primary display
 

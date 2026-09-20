@@ -155,14 +155,40 @@ at the default window size in both themes, which is how the deferral bars were
 found to be drawing along the wrong axis and reading as equal lengths whatever
 their counts were.
 
-**Stage 3 — settings**, moving the theme out of the registry and adding the
-schedule and detector tables. That is the last of P4: the daily metrics this
-list used to hold back for a stage of their own are counted over the event log
-on demand, so there is no rollup left to build.
+P4 is done. The settings that were going to be its third stage moved to P5,
+where they belong beside the first-run screens that set them; the daily metrics
+that were going to be a stage of their own are counted over the event log on
+demand, so there was no rollup left to build.
 
-## P5 — Onboarding and settings
+## P5 — Onboarding and settings (done)
 
-First-run setup and full configuration of schedules and detectors.
+**Settings.** Break interval, break length, warning lead time, idle threshold,
+theme, break-screen evidence, and autostart. They live in the `settings` table
+beside the history, which is the move `shell/theme` was parked in the shell
+namespace to make easy. Window geometry stays in the shell namespace: a setting
+is something the user chose and would be annoyed to lose, geometry is where a
+window happened to be.
+
+Validation refuses and never repairs. Nothing the user typed is clamped, a
+refused value keeps its place in the box, and the message says what is wrong in
+the terms they set it in. Changes reach the running session at once, and a
+change to the interval keeps the focus time already accrued — shortening it
+below what has passed makes a break due on the next tick, which is the honest
+answer rather than a glitch.
+
+Autostart is the per-user Run key, and the registry rather than the setting is
+what the checkbox shows, because the registry is what actually runs at sign-in.
+
+**First run.** Three screens: what Ocura does and that it makes no medical
+claims, a rhythm with the 20-20-20 origin sourced from
+[EVIDENCE.md](EVIDENCE.md), and whether to start with Windows, asked rather
+than assumed. Then it gets out of the way. No splash screen — an artificial
+delay to look professional contradicts a product built on respecting the user's
+time. `--first-run` shows it again, for testing; there is no button for it.
+
+Verified end to end on a real database: a legacy `shell/theme` moved out and
+its key removed, three screens answered, a 45-minute rhythm written to the file
+at schema v3, and no dialog on the second launch.
 
 ## P6 — Visual polish
 
