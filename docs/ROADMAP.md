@@ -136,9 +136,29 @@ schema, on the same file: the v1 database left behind by that first run was
 upgraded in place, its four rows survived with NULL durations, and the break
 taken afterwards recorded a duration of 20.0.
 
-**Stage 2 — settings**, moving the theme out of the registry and adding the
-schedule and detector tables. **Stage 3 — daily metrics** and the Statistics
-page, which stays honestly empty until there is something real to put in it.
+**Stage 2 — the statistics page (done).** Today and the last seven days, read
+from the Stage 1 log: time at the screen per day, breaks taken, the average
+focus block, and — given the most weight on the page — every time Ocura held a
+break back, counted by why. That last section is the one that answers "it
+interrupted me too often" with evidence rather than with an opinion.
+
+Informational only, and enforced as such: no streaks, no goals, nothing
+"missed", no percentage "achieved", and no colour that sorts days into good and
+bad. The language rule is a shared word list that the dashboard's test and this
+page's test both run against. A first week with nothing in it says so plainly
+and says when there will be something, rather than drawing an empty chart. The
+week chart is painted with Qt — no charting dependency for one bar chart — and
+takes its colours from the tokens in both themes.
+
+Verified by looking at it, not only by tests: rendered over a seeded database
+at the default window size in both themes, which is how the deferral bars were
+found to be drawing along the wrong axis and reading as equal lengths whatever
+their counts were.
+
+**Stage 3 — settings**, moving the theme out of the registry and adding the
+schedule and detector tables. That is the last of P4: the daily metrics this
+list used to hold back for a stage of their own are counted over the event log
+on demand, so there is no rollup left to build.
 
 ## P5 — Onboarding and settings
 

@@ -208,15 +208,15 @@ def test_navigation_switches_pages(qtbot, icon, settings):
 
 
 def test_placeholders_promise_nothing_they_do_not_have(qtbot, icon, settings):
+    """Settings is the only section still a promise. Statistics arrived in P4."""
     window = MainWindow(icon, settings)
     qtbot.addWidget(window)
     text = " ".join(
         label.text()
-        for index in (1, 2)
-        for label in window._pages.widget(index).findChildren(type(window.dashboard._headline))
+        for label in window._pages.widget(2).findChildren(type(window.dashboard._headline))
     )
-    assert "Coming in P4" in text
     assert "Coming in P5" in text
+    assert "Coming in P4" not in text, "Statistics is built; nothing should still promise it"
 
 
 def test_tray_tracks_the_view(qtbot, icon):

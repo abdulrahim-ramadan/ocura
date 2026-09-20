@@ -18,7 +18,7 @@ from ocura.domain.context import Deferral, Interruptible, RestSatisfied
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import TimerState
 
-from .conftest import FakeMonotonicClock, FakeWallClock, ScriptedContext
+from .conftest import ACCUSATORY_WORDS, FakeMonotonicClock, FakeWallClock, ScriptedContext
 
 
 @pytest.fixture
@@ -264,10 +264,9 @@ def test_no_event_text_is_accusatory(
     presenter.set_paused(False)
     view = run_for(presenter, clock, schedule.focus_interval + schedule.break_duration)
 
-    forbidden = ("missed", "failed", "should", "streak", "skipped", "overdue", "too long")
     words = " ".join(line.text for line in view.events).lower()
     words += f" {view.headline} {view.detail} {presenter.tooltip()}".lower()
-    assert not [bad for bad in forbidden if bad in words]
+    assert not [bad for bad in ACCUSATORY_WORDS if bad in words]
 
 
 def test_break_due_is_not_shown_as_an_event(

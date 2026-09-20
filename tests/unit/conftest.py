@@ -8,6 +8,29 @@ from ocura.domain.context import ContextAssessment, Interruptible
 from ocura.domain.schedule import BreakSchedule
 from ocura.domain.timer import BreakTimer, TimerSnapshot
 
+#: The language rule, in one place because it applies to every surface Ocura
+#: has. Ocura reports what happened and never grades it: there is no target to
+#: fall short of, so there is nothing to have missed and nothing to keep up.
+#:
+#: Shared by the dashboard's `test_no_event_text_is_accusatory` and the
+#: statistics page's, because a rule enforced on one screen and not the other
+#: is a rule the next screen will quietly break.
+ACCUSATORY_WORDS = (
+    "missed",
+    "failed",
+    "should",
+    "streak",
+    "skipped",
+    "overdue",
+    "too long",
+    "goal",
+    "target",
+    "achieved",
+    "on track",
+    "behind",
+    "well done",
+)
+
 
 class FakeMonotonicClock:
     """Time moves only when a test says so, so nothing here ever sleeps."""

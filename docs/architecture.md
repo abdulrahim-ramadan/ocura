@@ -863,6 +863,86 @@ history.
 handling opens a transaction before DML but not before DDL — exactly the wrong
 way round for a migration that has to be all-or-nothing.
 
+### The statistics page
+
+A second seam, built the same way as the first. `StatisticsSource`
+(`application/statistics.py`) is a one-method protocol — `read(days)` — and the
+shapes it returns live up there with it, exactly as `SessionEvent` does.
+`StatisticsStore` implements it over SQLite, `NullStatistics` is what runs when
+there is nowhere to read from, and the page behaves identically with it.
+
+There is no `daily_metrics` table. A day is a count over the log, a week is
+seven of them, and a stored rollup would be a second copy of the truth free to
+disagree with the events it summarises — the argument this codebase has already
+made twice, about owed breaks and about session totals. A week is a few hundred
+rows.
+
+**Day bucketing is done in Python, not in SQL.** Rows are stored in UTC because
+a log ordered in mixed zones is not ordered, and a day is a local thing.
+SQLite's `datetime(..., 'localtime')` reads the host's zone and cannot be
+pointed at another one for a test, so the range filter runs in SQL over UTC
+text and `datetime.astimezone` does the conversion. The tests drive it at fixed
+offsets on both sides of UTC, across a midnight, a month end and a year end.
+
+**"At the screen" is the sum of measured focus blocks**, taken from the
+`duration` on each `BREAK_DUE` row — a monotonic measurement made when the
+block completed. Not the wall-clock gap between rows: a laptop that slept for
+three hours between two events would book that sleep as three hours of screen
+time. The cost is that a block still running, or one ended by stopping the
+session before a break came due, is not counted, so today's figure can lag by
+up to one focus interval. The page says as much in its own subheading. A number
+that is honestly incomplete beats one that is silently wrong.
+
+**Deferral reasons are folded into families.** The idle detector writes its
+measurement into its reason — `idle for 312s` — so grouping on the raw string
+would produce one bucket per deferral and a list nobody can read. The folding
+is prefix-matched in one place, and a reason this build has never heard of is
+kept verbatim rather than swept into an "Other": a detector added later shows
+up as itself on the day it ships, the same rule that makes `StoredEvent.event_kind`
+return None for an unknown kind instead of refusing the row.
+
+That section is the reason the page exists. It is what answers "it interrupted
+me too often" with evidence — how often Ocura held a break back and why — so it
+gets a card of its own at the foot of the column, a sentence explaining itself,
+and a proportional bar per reason. `CHART_HEIGHT` is set so that all of it fits
+above the fold in a default-sized window rather than being chosen by eye.
+
+### What the statistics page refuses to show
+
+No streaks. No goals. Nothing "missed" and nothing "achieved". No percentage of
+breaks taken against a target, because there is no target. No colour that sorts
+days into good and bad — there is one bar colour, and today's column is drawn
+in the accent for the same reason the sidebar marks the current section, which
+is a statement about which day is now and not about how the day went.
+
+The moment a number has a score attached, the rational thing to do with it is
+to game it, and a break taken to keep a number up is not a break.
+
+The rule is enforced rather than remembered. `ACCUSATORY_WORDS` lives in
+`tests/unit/conftest.py` and is shared by the dashboard's
+`test_no_event_text_is_accusatory` and the statistics page's: a rule checked on
+one screen and not the other is a rule the next screen quietly breaks.
+
+### The chart
+
+Qt, not a charting library. A dependency for one bar chart is a dependency to
+package, license, audit and carry into every build, in exchange for a rounded
+rectangle. What it costs instead is `Bar`, a `QWidget` that fills a fraction of
+itself — vertically for a day column, horizontally for a deferral row.
+
+Its colour comes from the token set the same way the break overlay's shape
+does: QSS sets `color` on the object name and `paintEvent` reads it back off
+the palette, so no colour is written in Python and a theme is still only
+`style.qss` plus `theme.py`. `chart_bar` is a token of its own rather than a
+border or a surface reused, because bars are a measurement and retuning the
+chrome should not silently retune them.
+
+Two things here are asserted against pixels rather than against wiring. A bar
+drawn along the wrong axis passes every test that only reads its fraction back
+— which is how the deferral rows first shipped all the same length — so the
+tests render a bar and count the pixels it actually painted, in the colour it
+actually resolved to.
+
 ### WAL, read back rather than requested
 
 `PRAGMA journal_mode = WAL` **returns the mode SQLite settled on** instead of
