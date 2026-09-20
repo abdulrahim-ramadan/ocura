@@ -4,27 +4,42 @@ Migrations are a tuple in a module, not a directory of numbered files. At this
 size the entire history fits on one screen, and a step that cannot be read next
 to the one before it is a step nobody will check.
 
-`PRAGMA user_version` is the version marker rather than a table of our own. It
-is one integer in the database header, it is written inside the same
+`PRAGMA user_version` is the authoritative marker rather than a table of our
+own. It is one integer in the database header, it is written inside the same
 transaction as the DDL it describes, and it therefore cannot get out of step
 with the schema it claims to describe.
+
+The `schema_version` table beside it is a **ledger, not a second marker**: one
+row per step that has been applied, with the time it was applied. It answers a
+question the pragma cannot — *when did this file become a v2* — which is the
+first thing worth knowing when a tester's database behaves unlike anyone
+else's. `migrate()` reads the pragma and never the ledger, so the two cannot
+disagree about what the schema is; the ledger only ever adds to what the pragma
+already says.
 
 **No user identifier, ever.** Not a UUID, not a machine ID, not a hashed one.
 This is a permanent architectural constraint rather than a default waiting to
 be revisited: data that cannot identify anyone cannot leak anyone.
-`tests/unit/test_storage.py` reads the real `PRAGMA table_info` of a migrated
-database and fails on any column that looks like one, so the constraint is
-enforced against the schema that actually exists rather than against intent.
+`tests/unit/test_storage.py` reads the real `PRAGMA table_info` of every table
+in a migrated database and fails on any column that looks like one, so the
+constraint is enforced against the schema that actually exists rather than
+against intent.
 """
 
 from __future__ import annotations
 
 import sqlite3
+from datetime import UTC, datetime
 
 from ocura.infrastructure.storage.errors import FutureSchemaError
 
 #: What this build writes and expects to read.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+#: The migration ledger. Not listed in MIGRATIONS on purpose: it has to exist
+#: before the first step can record itself, including on a file that is being
+#: created from nothing, so it cannot be one of the things a step creates.
+VERSION_TABLE = "schema_version"
 
 #: Step n takes a database at version n to version n + 1, so MIGRATIONS[0]
 #: takes an empty file to version 1. Append; never edit one that has shipped.
@@ -51,6 +66,18 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "CREATE INDEX events_at ON events (at)",
         "CREATE INDEX events_run ON events (run, id)",
     ),
+    (
+        # Seconds, and nullable rather than defaulted to zero: NULL means no
+        # duration applies to this kind of event, which is a different fact
+        # from a break that lasted no time at all. A break skipped instantly
+        # and a session being paused must not read the same.
+        #
+        # REAL because the source is a monotonic clock in seconds. Rounding to
+        # whole seconds at the point of storage would throw away the only
+        # evidence that distinguishes a twenty-second break from one ended at
+        # nineteen point nine.
+        "ALTER TABLE events ADD COLUMN duration REAL",
+    ),
 )
 
 
@@ -61,20 +88,27 @@ def schema_version(connection: sqlite3.Connection) -> int:
 def migrate(connection: sqlite3.Connection) -> int:
     """Bring a database up to SCHEMA_VERSION. Idempotent; returns the version.
 
-    Each step and the version bump that records it share one transaction, so a
-    step that fails leaves the file exactly as it was. A half-applied migration
-    carrying a version number that claims otherwise is a database that fails
-    the same way on every launch afterwards, with no way back.
+    Each step, the ledger row recording it and the version bump share one
+    transaction, so a step that fails leaves the file exactly as it was. A
+    half-applied migration carrying a version number that claims otherwise is a
+    database that fails the same way on every launch afterwards, with no way
+    back.
     """
     current = schema_version(connection)
     if current > SCHEMA_VERSION:
         raise FutureSchemaError(current, SCHEMA_VERSION)
+
+    _ensure_ledger(connection, current)
 
     for version in range(current, SCHEMA_VERSION):
         connection.execute("BEGIN")
         try:
             for statement in MIGRATIONS[version]:
                 connection.execute(statement)
+            connection.execute(
+                f"INSERT OR REPLACE INTO {VERSION_TABLE} (version, applied_at) VALUES (?, ?)",
+                (version + 1, datetime.now(UTC).isoformat()),
+            )
             # PRAGMA takes no bound parameter, so this one interpolation is
             # unavoidable. It is safe because `version` is a loop index over a
             # module constant and can never come from outside this process.
@@ -85,3 +119,63 @@ def migrate(connection: sqlite3.Connection) -> int:
         connection.execute("COMMIT")
 
     return schema_version(connection)
+
+
+def migration_log(connection: sqlite3.Connection) -> list[tuple[int, str | None]]:
+    """Every version this file has been through, oldest first.
+
+    `applied_at` is None for a version that was applied before this build
+    started keeping the ledger — which is every v1 database written by the
+    first release. The version was reached; when is not recoverable, and
+    inventing a timestamp for it would make the column worthless for the ones
+    that are real.
+    """
+    rows = connection.execute(
+        f"SELECT version, applied_at FROM {VERSION_TABLE} ORDER BY version"
+    ).fetchall()
+    return [(int(row[0]), row[1]) for row in rows]
+
+
+def _ensure_ledger(connection: sqlite3.Connection, current: int) -> None:
+    """Create the ledger if it is absent, and account for versions already applied.
+
+    Outside the migration loop because the loop's first step has to be able to
+    write into it.
+
+    The existence check comes first so that opening an already-current database
+    writes nothing whatsoever. That matters for a file the process cannot write
+    to — one on a read-only volume, or locked down by policy — where reading
+    the history back is still worth doing and a gratuitous CREATE TABLE IF NOT
+    EXISTS would have refused the open outright.
+    """
+    if _has_ledger(connection):
+        return
+
+    connection.execute("BEGIN")
+    try:
+        connection.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {VERSION_TABLE} (
+                version    INTEGER PRIMARY KEY,
+                applied_at TEXT
+            )
+            """
+        )
+        # A file written by the first release reached v1 with no ledger to
+        # record it. Backfill the fact without the time: see migration_log.
+        for version in range(1, current + 1):
+            connection.execute(
+                f"INSERT OR IGNORE INTO {VERSION_TABLE} (version, applied_at) VALUES (?, NULL)",
+                (version,),
+            )
+    except sqlite3.Error:
+        connection.execute("ROLLBACK")
+        raise
+    connection.execute("COMMIT")
+
+
+def _has_ledger(connection: sqlite3.Connection) -> bool:
+    found = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (VERSION_TABLE,)
+    ).fetchone()
+    return found is not None

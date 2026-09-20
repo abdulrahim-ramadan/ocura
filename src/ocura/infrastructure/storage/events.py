@@ -33,6 +33,11 @@ class StoredEvent:
     kind: str
     state: str
     detail: str
+    #: Seconds, or None where the event is not about a span of time. Kept
+    #: nullable rather than defaulted: a break skipped the instant it began
+    #: lasted zero seconds, and a session being paused lasted nothing at all,
+    #: and those are not the same row.
+    duration: float | None = None
 
     @property
     def event_kind(self) -> SessionEventKind | None:
@@ -82,13 +87,15 @@ class EventStore:
         """Append one event. Raises StorageError; never returns a failure quietly."""
         try:
             self._connection.execute(
-                "INSERT INTO events (run, at, kind, state, detail) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO events (run, at, kind, state, detail, duration) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     self._run,
                     _utc_text(event.at),
                     str(event.kind),
                     str(event.state),
                     event.detail,
+                    event.duration,
                 ),
             )
         except sqlite3.Error as exc:
@@ -97,14 +104,16 @@ class EventStore:
     def recent(self, limit: int = 100) -> list[StoredEvent]:
         """The newest events first, which is the order every view of them wants."""
         return self._read(
-            "SELECT id, run, at, kind, state, detail FROM events ORDER BY id DESC LIMIT ?",
+            "SELECT id, run, at, kind, state, detail, duration "
+            "FROM events ORDER BY id DESC LIMIT ?",
             (limit,),
         )
 
     def for_run(self, run: int | None = None) -> list[StoredEvent]:
         """One launch of the application, oldest first."""
         return self._read(
-            "SELECT id, run, at, kind, state, detail FROM events WHERE run = ? ORDER BY id",
+            "SELECT id, run, at, kind, state, detail, duration "
+            "FROM events WHERE run = ? ORDER BY id",
             (self._run if run is None else run,),
         )
 
@@ -127,6 +136,7 @@ class EventStore:
                 kind=row["kind"],
                 state=row["state"],
                 detail=row["detail"],
+                duration=None if row["duration"] is None else float(row["duration"]),
             )
             for row in rows
         ]

@@ -24,7 +24,13 @@ from ocura.infrastructure.storage.database import (
 )
 from ocura.infrastructure.storage.errors import FutureSchemaError, StorageError
 from ocura.infrastructure.storage.events import EventStore, StoredEvent, next_run
-from ocura.infrastructure.storage.schema import SCHEMA_VERSION, migrate, schema_version
+from ocura.infrastructure.storage.schema import (
+    SCHEMA_VERSION,
+    VERSION_TABLE,
+    migrate,
+    migration_log,
+    schema_version,
+)
 
 #: The connection type, re-exported so that callers above this package can name
 #: one without importing sqlite3 — which the domain, the application layer and
@@ -34,6 +40,7 @@ Connection = sqlite3.Connection
 __all__ = [
     "DATABASE_NAME",
     "SCHEMA_VERSION",
+    "VERSION_TABLE",
     "Connection",
     "EventStore",
     "FutureSchemaError",
@@ -42,6 +49,7 @@ __all__ = [
     "close_database",
     "default_database_path",
     "migrate",
+    "migration_log",
     "next_run",
     "open_database",
     "open_event_store",
