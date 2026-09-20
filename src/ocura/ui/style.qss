@@ -119,6 +119,57 @@ QLabel {{
     font-size: {font_size_m};
 }}
 
+/* --- statistics ------------------------------------------------------- */
+
+/* The bars are painted by ocura.ui.statistics.Bar, which reads this colour
+   back off its palette. Same route as the break overlay's shape: no colour is
+   written in Python, so a theme is still only this file plus the tokens. */
+#Bar {{
+    color: {chart_bar};
+}}
+
+/* Today, marked the way the sidebar marks the current section. Not a verdict
+   on the day — there are no good and bad days on this page. */
+#TodayBar {{
+    color: {accent};
+}}
+
+/* The deferral proportions. The accent, because this is the section the page
+   exists for, and every row carries it equally. */
+#ReasonBar {{
+    color: {accent};
+}}
+
+#BarValue {{
+    color: {text_faint};
+    font-size: {font_size_s};
+}}
+
+#BarLabel {{
+    color: {text_muted};
+    font-size: {font_size_s};
+}}
+
+#BarLabelToday {{
+    color: {text};
+    font-size: {font_size_s};
+}}
+
+#BarDate {{
+    color: {text_faint};
+    font-size: {font_size_s};
+}}
+
+#ReasonLabel {{
+    color: {text};
+    font-size: {font_size_m};
+}}
+
+#ReasonCount {{
+    color: {text_muted};
+    font-size: {font_size_m};
+}}
+
 /* --- controls --------------------------------------------------------- */
 
 QPushButton {{

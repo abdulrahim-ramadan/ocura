@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
 )
 
 from ocura.application.presenter import SessionView
+from ocura.application.statistics import StatisticsPresenter
 from ocura.ui.motion import MOTION
+from ocura.ui.statistics import StatisticsPage
 from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import DashboardView, PlaceholderView
 
@@ -31,7 +33,18 @@ class MainWindow(QMainWindow):
     hidden = Signal()
     themeToggled = Signal()
 
-    def __init__(self, icon: QIcon, settings: QSettings, parent: QWidget | None = None) -> None:
+    #: The index of the Statistics page in both the sidebar and the stack. One
+    #: constant rather than a literal in each: they have to agree, and a pair
+    #: of bare 1s is exactly the kind of agreement that quietly stops holding.
+    STATISTICS = 1
+
+    def __init__(
+        self,
+        icon: QIcon,
+        settings: QSettings,
+        statistics: StatisticsPresenter | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._settings = settings
 
@@ -42,13 +55,8 @@ class MainWindow(QMainWindow):
         self.dashboard = DashboardView()
         self._pages = QStackedWidget()
         self._pages.addWidget(self.dashboard)
-        self._pages.addWidget(
-            PlaceholderView(
-                "Statistics",
-                "Coming in P4. Ocura keeps nothing on disk yet, so there is no history "
-                "to show — and inventing some would be worse than an empty page.",
-            )
-        )
+        self.statistics = StatisticsPage(statistics)
+        self._pages.addWidget(self.statistics)
         self._pages.addWidget(
             PlaceholderView(
                 "Settings",
@@ -111,12 +119,23 @@ class MainWindow(QMainWindow):
         if index == self._pages.currentIndex():
             return
         self._pages.setCurrentIndex(index)
+        # Read on arrival rather than on a timer. The window is hidden most of
+        # the time and the page is a query over a file somebody may have been
+        # writing to all day; refreshing it when it is not on screen is work
+        # nobody asked for, and refreshing it while it is read is a page that
+        # rearranges itself under the reader.
+        if index == self.STATISTICS:
+            self.statistics.refresh()
         MOTION.fade_in(self._pages.currentWidget())
 
     def render(self, view: SessionView) -> None:
         self.dashboard.render(view)
 
     def show_and_raise(self) -> None:
+        # Coming back to a window left on Statistics must not show yesterday's
+        # numbers: the process outlives the day it started in.
+        if self._pages.currentIndex() == self.STATISTICS:
+            self.statistics.refresh()
         if self.isMinimized():
             self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
         self.show()

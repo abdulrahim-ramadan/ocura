@@ -10,11 +10,17 @@ from PySide6.QtWidgets import QApplication
 
 from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.presenter import BreakPresenter, SessionView
+from ocura.application.statistics import (
+    NullStatistics,
+    StatisticsPresenter,
+    StatisticsSource,
+)
 from ocura.domain.schedule import DEFAULT_SCHEDULE, BreakSchedule
 from ocura.infrastructure.clock import SystemMonotonicClock, SystemWallClock
 from ocura.infrastructure.storage import (
     Connection,
     EventStore,
+    StatisticsStore,
     StorageError,
     close_database,
     default_database_path,
@@ -42,7 +48,9 @@ APPLICATION = "Ocura"
 THEME_KEY = "shell/theme"
 
 
-def open_history(path: Path | None = None) -> tuple[Connection | None, SessionJournal]:
+def open_history(
+    path: Path | None = None,
+) -> tuple[Connection | None, SessionJournal, StatisticsSource]:
     """Open the history database, or carry on without one and say so.
 
     Ocura does not fail to start because a disk did. Everything the product
@@ -56,10 +64,13 @@ def open_history(path: Path | None = None) -> tuple[Connection | None, SessionJo
         connection, store = open_event_store(path)
     except StorageError as exc:
         logger.warning("history is unavailable, continuing without it: %s", exc)
-        return None, NullJournal()
+        # Both seams, not just the journal: a statistics page with nothing
+        # behind it says there is nothing to show, which is true, rather than
+        # failing to open.
+        return None, NullJournal(), NullStatistics()
 
     logger.info("history at %s, run %d", path or default_database_path(), store.run)
-    return connection, store
+    return connection, store, StatisticsStore(connection)
 
 
 def initial_theme(settings: QSettings) -> str:
@@ -95,7 +106,7 @@ class OcuraApp:
         self._settings = settings or QSettings(ORGANISATION, APPLICATION)
 
         monotonic = SystemMonotonicClock()
-        self._database, self.journal = open_history()
+        self._database, self.journal, statistics = open_history()
         presenter = BreakPresenter(
             schedule,
             monotonic,
@@ -108,7 +119,7 @@ class OcuraApp:
 
         icon = app_icon()
         self.driver = TickDriver(presenter, app)
-        self.window = MainWindow(icon, self._settings)
+        self.window = MainWindow(icon, self._settings, StatisticsPresenter(statistics, schedule))
         self.tray = Tray(icon, app)
         self.toast = BreakToast()
         self.overlay = OverlayManager()
@@ -239,7 +250,7 @@ def self_check() -> int:
         # permissions problem under %LOCALAPPDATA% shows up, and the log it
         # would appear in is the one a windowed build does not have.
         lines.append(f"history path: {default_database_path()}")
-        connection, journal = open_history()
+        connection, journal, _ = open_history()
         if isinstance(journal, EventStore):
             lines.append(f"history: ok, run {journal.run}, {journal.count()} events")
         else:

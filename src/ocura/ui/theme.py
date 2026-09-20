@@ -62,6 +62,17 @@ class Tokens:
     accent_text: str
     accent_quiet: str
 
+    #: The week chart's bars. A colour of their own rather than a border or a
+    #: surface reused: bars are data, and P6 retuning the chrome should not
+    #: silently retune the one thing on the page that is a measurement.
+    #:
+    #: There is exactly one bar colour. Today's column is drawn in the accent
+    #: instead — which marks *which day is now*, the same job the accent does
+    #: in the sidebar, and is not a judgement about the day. Nothing on this
+    #: page colours a day as good or bad, because nothing on this page has an
+    #: opinion about a day.
+    chart_bar: str
+
     #: Selection is marked, not shouted: a barely-there tint plus a thin accent
     #: edge. The loudest thing on screen should never be "which tab am I on".
     nav_selected: str
@@ -161,6 +172,7 @@ DARK = Tokens(
     accent="#6ec6b8",
     accent_text="#0f1416",
     accent_quiet="#243033",
+    chart_bar="#38444c",
     nav_selected="#1f2428",
     **_OVERLAY,
     **_SHARED,
@@ -178,6 +190,7 @@ LIGHT = Tokens(
     accent="#2f6f67",
     accent_text="#ffffff",
     accent_quiet="#e4ecea",
+    chart_bar="#ccd7de",
     nav_selected="#eaeef1",
     **_OVERLAY,
     **_SHARED,
