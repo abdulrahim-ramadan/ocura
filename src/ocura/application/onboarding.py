@@ -79,7 +79,7 @@ RHYTHM = Screen(
 )
 
 AUTOSTART = Screen(
-    title="Should Ocura start with Windows?",
+    title="Start Ocura when you sign in?",
     body=(
         "Ocura only helps on the days it is running, so most people want it to start when "
         "they sign in. It starts minimised to the notification area and does not open a "
