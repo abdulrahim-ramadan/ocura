@@ -24,8 +24,6 @@ from enum import IntEnum
 from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.settings import DEFAULTS, RHYTHM_MINUTES, Settings
 
-ONBOARDING = "Onboarding"
-
 
 class Step(IntEnum):
     """Ordered, because "next" and "back" are the whole navigation."""
@@ -47,16 +45,16 @@ class Screen:
 
 
 WELCOME = Screen(
-    title=QT_TRANSLATE_NOOP(ONBOARDING, "Ocura watches the clock so you do not have to"),
+    title=QT_TRANSLATE_NOOP("Onboarding", "Ocura watches the clock so you do not have to"),
     body=QT_TRANSLATE_NOOP(
-        ONBOARDING,
+        "Onboarding",
         "Ocura times how long you have been at the screen and offers you a short break "
         "when one is due. It tries hard not to interrupt at a bad moment: while your "
         "screen is locked, while something is running full screen, or while you are away "
         "from the keyboard, it waits and offers the break later.",
     ),
     note=QT_TRANSLATE_NOOP(
-        ONBOARDING,
+        "Onboarding",
         "You can always postpone a break or end one early — Ocura never locks you out of "
         "your own machine. It is a wellness and productivity tool, not a medical device. "
         "It does not diagnose anything and makes no medical claims.",
@@ -69,16 +67,16 @@ WELCOME = Screen(
 #: not an attribution. The organisations are named instead, which is the part
 #: that can actually be followed up.
 RHYTHM = Screen(
-    title=QT_TRANSLATE_NOOP(ONBOARDING, "Pick a rhythm"),
+    title=QT_TRANSLATE_NOOP("Onboarding", "Pick a rhythm"),
     body=QT_TRANSLATE_NOOP(
-        ONBOARDING,
+        "Onboarding",
         "Every 20 minutes, look at something about 20 feet away for 20 seconds. That is "
         "the 20-20-20 guideline, recommended by the American Academy of Ophthalmology and "
         "the American Optometric Association as an easy rhythm to remember rather than as "
         "a result from a trial.",
     ),
     note=QT_TRANSLATE_NOOP(
-        ONBOARDING,
+        "Onboarding",
         "Twenty minutes is the guideline, and the longer options are here because a rhythm "
         "you will actually keep beats one you turn off by lunchtime. You can change this "
         "whenever you like in Settings.",
@@ -86,15 +84,15 @@ RHYTHM = Screen(
 )
 
 AUTOSTART = Screen(
-    title=QT_TRANSLATE_NOOP(ONBOARDING, "Start Ocura when you sign in?"),
+    title=QT_TRANSLATE_NOOP("Onboarding", "Start Ocura when you sign in?"),
     body=QT_TRANSLATE_NOOP(
-        ONBOARDING,
+        "Onboarding",
         "Ocura only helps on the days it is running, so most people want it to start when "
         "they sign in. It starts minimised to the notification area and does not open a "
         "window.",
     ),
     note=QT_TRANSLATE_NOOP(
-        ONBOARDING,
+        "Onboarding",
         "Asked rather than assumed. If you say no, nothing is added to your startup list "
         "and you can turn this on later in Settings. If you say yes, you can still remove "
         "it yourself from Task Manager, under Startup.",
@@ -106,9 +104,9 @@ SCREENS = {Step.WELCOME: WELCOME, Step.RHYTHM: RHYTHM, Step.AUTOSTART: AUTOSTART
 #: The label on the button that leaves each screen. The last one commits, and
 #: says so: "Next" on a final screen is a button that hides what it does.
 ADVANCE_LABELS = {
-    Step.WELCOME: QT_TRANSLATE_NOOP(ONBOARDING, "Next"),
-    Step.RHYTHM: QT_TRANSLATE_NOOP(ONBOARDING, "Next"),
-    Step.AUTOSTART: QT_TRANSLATE_NOOP(ONBOARDING, "Start using Ocura"),
+    Step.WELCOME: QT_TRANSLATE_NOOP("Onboarding", "Next"),
+    Step.RHYTHM: QT_TRANSLATE_NOOP("Onboarding", "Next"),
+    Step.AUTOSTART: QT_TRANSLATE_NOOP("Onboarding", "Start using Ocura"),
 }
 
 
@@ -203,14 +201,14 @@ class Onboarding:
         screen = SCREENS[self._step]
         return OnboardingView(
             step=self._step,
-            title=translate(ONBOARDING, screen.title),
-            body=translate(ONBOARDING, screen.body),
-            note=translate(ONBOARDING, screen.note),
+            title=translate("Onboarding", screen.title),
+            body=translate("Onboarding", screen.body),
+            note=translate("Onboarding", screen.note),
             position=int(self._step) + 1,
             total=len(Step),
             can_go_back=self._step is not Step.WELCOME,
             is_last=self._step is Step.AUTOSTART,
-            advance_label=translate(ONBOARDING, ADVANCE_LABELS[self._step]),
+            advance_label=translate("Onboarding", ADVANCE_LABELS[self._step]),
             rhythm_choices=RHYTHM_MINUTES,
             chosen_minutes=round(self._settings.focus_interval / 60),
             autostart=self._settings.autostart,

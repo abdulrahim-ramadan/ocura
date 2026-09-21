@@ -39,7 +39,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ocura.application.autostart import Autostart, AutostartUnavailable, NoAutostart
+from ocura.application.autostart import (
+    NO_STARTUP_LIST,
+    Autostart,
+    AutostartUnavailable,
+    NoAutostart,
+)
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.settings import (
     DEFAULTS,
     LANGUAGE_NAMES,
@@ -62,7 +68,10 @@ SPIN_CEILING = 100_000
 
 #: Source text for the theme names. Translated on every retranslate; the
 #: stored value is always the untranslated key.
-THEME_LABELS = {"dark": "Dark", "light": "Light"}
+THEME_LABELS = {
+    "dark": QT_TRANSLATE_NOOP("SettingsPage", "Dark"),
+    "light": QT_TRANSLATE_NOOP("SettingsPage", "Light"),
+}
 
 
 def _spin(value: int) -> QSpinBox:
@@ -114,14 +123,14 @@ class SettingRow(QWidget):
         self.retranslate()
 
     def retranslate(self) -> None:
-        self._title.setText(self.tr(self._source_title))
-        self._note.setText(self.tr(self._source_explanation))
+        self._title.setText(translate("SettingsPage", self._source_title))
+        self._note.setText(translate("SettingsPage", self._source_explanation))
         if self._source_suffix and isinstance(self._control, QSpinBox):
             # The unit belongs to the language, not to the number. German uses
             # "Min."; Arabic uses its own word and reads the other way round,
             # which Qt handles once the suffix is a translated string rather
             # than a constant baked in at construction.
-            self._control.setSuffix(self.tr(self._source_suffix))
+            self._control.setSuffix(translate("Units", self._source_suffix))
 
     def changeEvent(self, event) -> None:
         if event.type() == QEvent.Type.LanguageChange:
@@ -187,75 +196,97 @@ class SettingsPage(QWidget):
     def _rows_spec(self):
         return (
             (
-                "Rhythm",
+                QT_TRANSLATE_NOOP("SettingsPage", "Rhythm"),
                 (
                     (
                         "focus_interval",
-                        "Time between breaks",
-                        "How long a focus block runs before Ocura offers a break.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Time between breaks"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage",
+                            "How long a focus block runs before Ocura offers a break.",
+                        ),
                         self._interval,
-                        " min",
+                        QT_TRANSLATE_NOOP("Units", " min"),
                     ),
                     (
                         "break_duration",
-                        "Break length",
-                        "How long the break screen stays up. Twenty seconds is the "
-                        "guideline Ocura is built around.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Break length"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage",
+                            "How long the break screen stays up. Twenty seconds is the "
+                            "guideline Ocura is built around.",
+                        ),
                         self._duration,
-                        " sec",
+                        QT_TRANSLATE_NOOP("Units", " sec"),
                     ),
                     (
                         "pre_break_warning",
-                        "Warning lead time",
-                        "How long before a break Ocura says one is coming, so you can "
-                        "finish your thought.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Warning lead time"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage",
+                            "How long before a break Ocura says one is coming, so you can "
+                            "finish your thought.",
+                        ),
                         self._warning,
-                        " sec",
+                        QT_TRANSLATE_NOOP("Units", " sec"),
                     ),
                 ),
             ),
             (
-                "When not to interrupt",
+                QT_TRANSLATE_NOOP("SettingsPage", "When not to interrupt"),
                 (
                     (
                         "idle_threshold",
-                        "Idle threshold",
-                        "How long without keyboard or mouse before Ocura decides you are "
-                        "away and waits rather than offering a break to an empty chair.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Idle threshold"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage",
+                            "How long without keyboard or mouse before Ocura decides you are "
+                            "away and waits rather than offering a break to an empty chair.",
+                        ),
                         self._idle,
-                        " sec",
+                        QT_TRANSLATE_NOOP("Units", " sec"),
                     ),
                 ),
             ),
             (
-                "Language and appearance",
+                QT_TRANSLATE_NOOP("SettingsPage", "Language and appearance"),
                 (
                     (
                         "language",
-                        "Language",
-                        "Ocura follows your Windows language unless you choose one here.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Language"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage",
+                            "Ocura follows your Windows language unless you choose one here.",
+                        ),
                         self._language,
                         "",
                     ),
                     (
                         "theme",
-                        "Theme",
-                        "The dark and light themes for the main window.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Theme"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage", "The dark and light themes for the main window."
+                        ),
                         self._theme,
                         "",
                     ),
                     (
                         "tips",
-                        "Break-screen evidence",
-                        "The sourced line at the foot of the break screen.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Break-screen evidence"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage", "The sourced line at the foot of the break screen."
+                        ),
                         self._tips,
                         "",
                     ),
                     (
                         "autostart",
-                        "Start with Windows",
-                        "Adds Ocura to your sign-in startup list. You can also remove it "
-                        "from Task Manager, under Startup.",
+                        QT_TRANSLATE_NOOP("SettingsPage", "Start with Windows"),
+                        QT_TRANSLATE_NOOP(
+                            "SettingsPage",
+                            "Adds Ocura to your sign-in startup list. You can also remove it "
+                            "from Task Manager, under Startup.",
+                        ),
                         self._autostart_box,
                         "",
                     ),
@@ -289,7 +320,15 @@ class SettingsPage(QWidget):
         scroller.setWidget(content)
         scroller.setWidgetResizable(True)
         scroller.setFrameShape(QFrame.Shape.NoFrame)
-        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # As needed rather than always off. Off was right when every string was
+        # English and fitted: it kept a long sentence wrapping instead of
+        # sliding sideways. A translated interface is wider — the German
+        # dashboard's three buttons do not fit the minimum window, and the
+        # German week chart does not either — and a control that is simply not
+        # on the screen is worse than a scrollbar. Wrapping text still wraps:
+        # a bar appears only when something that cannot wrap, such as a row of
+        # buttons, needs more room than the window has.
+        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         root = QHBoxLayout(self)
         root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
@@ -330,7 +369,7 @@ class SettingsPage(QWidget):
             )
         )
         for label, title in self._sections:
-            label.setText(self.tr(title))
+            label.setText(translate("SettingsPage", title))
         for row in self._rows.values():
             row.retranslate()
 
@@ -343,10 +382,14 @@ class SettingsPage(QWidget):
         self._loading = True
         try:
             for index in range(self._theme.count()):
-                self._theme.setItemText(index, self.tr(THEME_LABELS[self._theme.itemData(index)]))
+                self._theme.setItemText(
+                    index, translate("SettingsPage", THEME_LABELS[self._theme.itemData(index)])
+                )
             for index in range(self._language.count()):
                 name = self._language.itemData(index)
-                self._language.setItemText(index, language_label(name, self.tr(SYSTEM_LABEL)))
+                self._language.setItemText(
+                    index, language_label(name, translate("SettingsPage", SYSTEM_LABEL))
+                )
         finally:
             self._loading = False
 
@@ -378,9 +421,7 @@ class SettingsPage(QWidget):
             )
             self._autostart_box.setEnabled(self._autostart.available)
             if not self._autostart.available:
-                self._rows["autostart"].show_problem(
-                    "Ocura cannot manage startup entries on this machine."
-                )
+                self._rows["autostart"].show_problem(translate("Autostart", NO_STARTUP_LIST))
         finally:
             self._loading = False
         for row in self._rows.values():

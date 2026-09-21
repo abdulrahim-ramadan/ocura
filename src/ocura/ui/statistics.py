@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.statistics import StatisticsPageView, StatisticsPresenter
 from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import _card, _label
@@ -250,15 +251,21 @@ class StatisticsPage(QWidget):
         metrics_layout.setSpacing(SPACING.xl)
         self._captions: list[tuple[object, str]] = []
         for widget, caption in (
-            (self._today, "At the screen today"),
-            (self._week, "This week"),
-            (self._breaks, "Breaks taken"),
-            (self._average, "Average focus block"),
+            (self._today, QT_TRANSLATE_NOOP("StatisticsPage", "At the screen today")),
+            (self._week, QT_TRANSLATE_NOOP("StatisticsPage", "This week")),
+            (self._breaks, QT_TRANSLATE_NOOP("StatisticsPage", "Breaks taken")),
+            (self._average, QT_TRANSLATE_NOOP("StatisticsPage", "Average focus block")),
         ):
             column = QVBoxLayout()
             column.setSpacing(SPACING.xs)
             column.addWidget(widget)
             label = _label("", "MetricLabel")
+            # One line, whatever the language. The card takes exactly the
+            # height its text needs, so a caption that wraps is a caption
+            # drawn outside its own box — which is how "Durchschnittlicher
+            # Fokusblock" lost its second line in a narrow window. Unwrapped,
+            # it asks for the width it needs instead, and the page scrolls.
+            label.setWordWrap(False)
             self._captions.append((label, caption))
             column.addWidget(label)
             metrics_layout.addLayout(column)
@@ -310,7 +317,15 @@ class StatisticsPage(QWidget):
         scroller.setWidget(content)
         scroller.setWidgetResizable(True)
         scroller.setFrameShape(QFrame.Shape.NoFrame)
-        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # As needed rather than always off. Off was right when every string was
+        # English and fitted: it kept a long sentence wrapping instead of
+        # sliding sideways. A translated interface is wider — the German
+        # dashboard's three buttons do not fit the minimum window, and the
+        # German week chart does not either — and a control that is simply not
+        # on the screen is worse than a scrollbar. Wrapping text still wraps:
+        # a bar appears only when something that cannot wrap, such as a row of
+        # buttons, needs more room than the window has.
+        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         root = QHBoxLayout(self)
         root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
@@ -325,7 +340,7 @@ class StatisticsPage(QWidget):
         through the query rather than through here.
         """
         for label, caption in self._captions:
-            label.setText(self.tr(caption))
+            label.setText(translate("StatisticsPage", caption))
         self._chart_title.setText(self.tr("At the screen, by day"))
 
     def changeEvent(self, event) -> None:

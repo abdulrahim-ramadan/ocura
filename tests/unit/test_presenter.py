@@ -105,7 +105,7 @@ def test_break_starts_and_finishes(
     assert [line.text for line in view.events[-2:]] == ["Break started", "Break finished"]
 
 
-def test_deferral_shows_the_detector_reason(
+def test_deferral_shows_the_detector_reason_in_the_reader_s_words(
     presenter: BreakPresenter,
     clock: FakeMonotonicClock,
     context: ScriptedContext,
@@ -117,10 +117,13 @@ def test_deferral_shows_the_detector_reason(
 
     assert view.state is TimerState.DEFERRED
     assert view.break_owed is True
-    assert view.waiting_reason == "session locked"
+    # The detector says "session locked"; the screen says the family it folds
+    # into, which is the string a translator was given. The raw words stay in
+    # the journal, where a history has to mean the same thing in any language.
+    assert view.waiting_reason == "Screen locked"
     assert view.headline == "Waiting for a good moment"
-    assert view.detail == "Break owed — session locked."
-    assert view.events[-1].text == "Waiting — session locked"
+    assert view.detail == "Break owed — Screen locked."
+    assert view.events[-1].text == "Waiting — Screen locked"
 
 
 def test_a_fullscreen_deferral_reads_differently(
@@ -132,7 +135,7 @@ def test_a_fullscreen_deferral_reads_differently(
     context.queue.append(Deferral(reason="fullscreen or presenting"))
     presenter.start()
     view = run_for(presenter, clock, schedule.focus_interval)
-    assert view.waiting_reason == "fullscreen or presenting"
+    assert view.waiting_reason == "Fullscreen or presenting"
 
 
 def test_the_reason_clears_when_the_break_is_satisfied(
@@ -151,7 +154,7 @@ def test_the_reason_clears_when_the_break_is_satisfied(
     assert view.state is TimerState.FOCUSING
     assert view.waiting_reason is None
     assert view.rests_credited == 1
-    assert view.events[-1].text == "Rest credited — session lock"
+    assert view.events[-1].text == "Rest credited — Screen locked"
 
 
 def test_pause_freezes_and_resume_continues(presenter: BreakPresenter, clock: FakeMonotonicClock):
@@ -282,7 +285,7 @@ def test_break_due_is_not_shown_as_an_event(
 
     assert [line.text for line in view.events] == [
         "Session started",
-        "Rest credited — session lock",
+        "Rest credited — Screen locked",
     ]
 
 
@@ -316,7 +319,7 @@ def test_tooltip_tracks_the_state(
 
     context.queue.append(Deferral(reason="session locked"))
     run_for(presenter, clock, schedule.focus_interval)
-    assert presenter.tooltip() == "Ocura — waiting, session locked"
+    assert presenter.tooltip() == "Ocura — waiting, Screen locked"
 
 
 def test_a_pollable_context_is_polled_every_tick(

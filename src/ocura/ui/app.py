@@ -10,6 +10,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
 from ocura.application.autostart import Autostart, AutostartUnavailable, NoAutostart
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.onboarding import Onboarding, needs_introduction
 from ocura.application.presenter import BreakPresenter, SessionView
@@ -39,6 +40,7 @@ from ocura.infrastructure.windows.autostart import build_autostart, startup_comm
 from ocura.infrastructure.windows.context import build_windows_context
 from ocura.ui import motion
 from ocura.ui.driver import TickDriver
+from ocura.ui.language import Language
 from ocura.ui.main_window import MainWindow
 from ocura.ui.motion import Motion
 from ocura.ui.onboarding import OnboardingDialog
@@ -165,6 +167,11 @@ class OcuraApp:
         self.journal = self._history.journal
         self.autostart = autostart or _autostart()
         self.preferences = self._load_preferences()
+        # Before any widget is built. A widget reads its strings once at
+        # construction and again on LanguageChange, and starting in English to
+        # switch a moment later would be a visible flicker on every launch.
+        self.language = Language(app)
+        self.language.apply(self.preferences.language)
         self._schedule = schedule = self.preferences.schedule()
 
         self._context = build_windows_context(
@@ -258,10 +265,26 @@ class OcuraApp:
         self._schedule = preferences.schedule()
         self.driver.presenter.apply(preferences)
         self._context.set_idle_threshold(preferences.idle_threshold)
+        self._apply_language(preferences.language)
         self._apply_theme(preferences.theme)
         # The change is visible at once rather than at the next tick, which for
         # a twenty-minute interval would be a second of a control looking dead.
         self.driver.refresh()
+
+    def _apply_language(self, language: str) -> None:
+        """Switch language live. Qt tells the widgets; the presenters recompute.
+
+        No restart, and no pretending. Installing a translator makes Qt post
+        LanguageChange to every widget, and each answers by re-setting the
+        strings it owns; everything else on screen is rendered from a presenter
+        on the next tick. The tray is the one thing Qt does not reach — it is a
+        QObject, not a widget — so it is told directly.
+        """
+        if self.language.resolve_current(language) == self.language.current:
+            return
+        self.language.apply(language)
+        self.tray.retranslate()
+        self.window.statistics.refresh()
 
     def _save_preferences(self, preferences: Settings) -> None:
         try:
@@ -312,7 +335,7 @@ class OcuraApp:
 
     def _render_toast(self, view: SessionView) -> None:
         if view.warning_visible:
-            self.toast.render(f"A break in {view.countdown_text}", can_snooze=view.can_snooze)
+            self.toast.render(view.warning_text, can_snooze=view.can_snooze)
             if not self.toast.isVisible():
                 self.toast.show_near_tray()
         elif self.toast.isVisible():
@@ -403,6 +426,7 @@ def self_check() -> int:
         qss = stylesheet(DARK)
         lines.append(f"stylesheet {QSS_PACKAGE}/{QSS_NAME}: {len(qss)} chars")
         lines.append(f"stylesheet resolved: {'ok' if DARK.accent in qss else 'BROKEN'}")
+        lines.extend(_catalogue_report(app))
 
         # A packaged build on someone else's machine is exactly where a
         # permissions problem under %LOCALAPPDATA% shows up, and the log it
@@ -423,6 +447,43 @@ def self_check() -> int:
 
     print("\n".join(lines))
     return 0
+
+
+#: A string every catalogue has, used only to ask whether one is really
+#: loaded. Marked rather than typed twice: if the tray's wording changes, this
+#: follows it, and a probe that silently stopped matching the catalogue would
+#: report every language as MISSING.
+TRAY_PROBE = QT_TRANSLATE_NOOP("Tray", "Ocura — not running")
+
+
+def _catalogue_report(app: QApplication) -> list[str]:
+    """One line per language, for the part of a build that fails silently.
+
+    A missing or unreadable .qm costs nothing at startup: Ocura runs in
+    English and says nothing about it, on a machine whose owner asked for
+    Arabic. So the check is not "is the file in the bundle" but "does a string
+    come back translated" — which is also the only thing that catches a
+    catalogue whose buffer was garbage-collected out from under QTranslator.
+    """
+    from ocura.application.settings import LANGUAGE_NAMES
+    from ocura.ui.language import SOURCE_LANGUAGE, Language
+
+    probe = translate("Tray", TRAY_PROBE)
+    handle = Language(app)
+    lines = []
+    for language in LANGUAGE_NAMES:
+        if language == SOURCE_LANGUAGE:
+            continue
+        handle.apply(language)
+        translated = translate("Tray", TRAY_PROBE)
+        # ascii(), not repr(): this report is redirected to a file from a
+        # console that is very often cp1252, and a self-check that dies
+        # printing Arabic is a self-check that reports nothing at all.
+        lines.append(
+            f"catalogue {language}: {'ok' if translated != probe else 'MISSING'} {translated!a}"
+        )
+    handle.apply(SOURCE_LANGUAGE)
+    return lines
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -14,9 +14,25 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
+
+#: Why a machine has no startup list at all. Marked here and translated where
+#: it is raised: an `AutostartUnavailable` is one of the two exceptions in
+#: Ocura whose message is shown to a person rather than written to a log, so
+#: its text is language and belongs in the catalogue with the rest.
+NO_STARTUP_LIST = QT_TRANSLATE_NOOP(
+    "Autostart", "Ocura cannot manage startup entries on this machine."
+)
+
 
 class AutostartUnavailable(RuntimeError):
-    """The startup entry could not be read or written, and why."""
+    """The startup entry could not be read or written, and why.
+
+    **Its message is user-facing.** The settings page puts `str(exc)` under the
+    control that caused it, which is the whole point of raising rather than
+    logging — so every message handed to one is translated at the moment it is
+    raised, and `tests/unit/test_no_bare_strings.py` checks that it is.
+    """
 
 
 @runtime_checkable
@@ -48,4 +64,4 @@ class NoAutostart:
 
     def set_enabled(self, enabled: bool) -> None:
         del enabled
-        raise AutostartUnavailable("Ocura cannot manage startup entries on this machine.")
+        raise AutostartUnavailable(translate("Autostart", NO_STARTUP_LIST))

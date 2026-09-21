@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from ocura.application import reasons
 from ocura.application.i18n import QT_TRANSLATE_NOOP, clock_text, translate
 from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.session import BreakSession, SessionEvent, SessionEventKind
@@ -35,13 +36,13 @@ TICK_SECONDS = 1.0
 #: This session only, cleared on restart. P4 makes history persistent.
 MAX_EVENTS = 100
 
-#: Translation contexts. One per surface rather than one per module: a
-#: translator sees "Dashboard" and knows where the sentence appears, which is
-#: the only thing a context is for.
-STATUS = "Status"
-EVENTS = "Events"
-TIPS = "Tips"
-TRAY = "Tray"
+#: Translation contexts are written as literals at every call site, never as
+#: constants. lupdate reads the source rather than running it, so
+#: `translate(STATUS, "Focusing")` extracts nothing at all — which is exactly
+#: how this was first written, and the catalogue came out with the whole
+#: application layer missing. The contexts here are "Status", "Events",
+#: "Tips" and "Tray": one per surface, because a translator seeing "Status"
+#: knows where the sentence appears, which is the only thing a context is for.
 
 #: Mirrors the domain guard on take_break_now, so the view never offers a
 #: control the timer would refuse.
@@ -60,17 +61,17 @@ _USER_MAY_ASK = frozenset({TimerState.FOCUSING, TimerState.BREAK_DUE, TimerState
 #: language switch look like it half-worked.
 BREAK_TIPS = (
     QT_TRANSLATE_NOOP(
-        TIPS,
+        "Tips",
         "Every 20 minutes, look at something 20 feet away for 20 seconds "
         "— American Academy of Ophthalmology",
     ),
     QT_TRANSLATE_NOOP(
-        TIPS,
+        "Tips",
         "Close work holds the lens under tension; looking into the distance is what "
         "lets it relax — American Optometric Association",
     ),
     QT_TRANSLATE_NOOP(
-        TIPS,
+        "Tips",
         "Blink rate falls by about half at a screen, which is what leaves eyes dry "
         "— American Optometric Association",
     ),
@@ -146,6 +147,12 @@ class SessionView:
     #: display. Stable for the whole of one break, since it is keyed to the
     #: count of breaks finished and that does not move while one is running.
     tip: str = ""
+
+    #: The one sentence on the pre-break toast. Here rather than assembled in
+    #: `OcuraApp` from an f-string, which is what it was and which meant the
+    #: one message that has to arrive before a break was the one message no
+    #: translator ever saw. Empty whenever the warning is not showing.
+    warning_text: str = ""
 
 
 class BreakPresenter:
@@ -277,7 +284,11 @@ class BreakPresenter:
             focus_elapsed_text=clock_text(snapshot.focus_elapsed),
             countdown_text=countdown,
             progress=max(0.0, min(1.0, progress)),
-            waiting_reason=self._waiting_reason if snapshot.break_owed else None,
+            waiting_reason=(
+                reasons.phrase(self._waiting_reason)
+                if snapshot.break_owed and self._waiting_reason
+                else None
+            ),
             warning_visible=state is TimerState.PRE_BREAK,
             overlay_visible=state is TimerState.ON_BREAK,
             breaks_taken=self._breaks_taken,
@@ -289,23 +300,36 @@ class BreakPresenter:
             # Empty rather than absent when the user has turned them off: the
             # break screen hides a tip it has not been given, and "no tip" is a
             # thing the view can say without a second flag to say it with.
-            tip=(BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)] if self._settings.tips else ""),
+            tip=(
+                translate("Tips", BREAK_TIPS[self._breaks_taken % len(BREAK_TIPS)])
+                if self._settings.tips
+                else ""
+            ),
+            # The same context the toast widget's own strings are extracted
+            # into, so a translator is handed the whole window at once.
+            warning_text=(
+                translate("BreakToast", "A break in %1").replace("%1", countdown)
+                if state is TimerState.PRE_BREAK
+                else ""
+            ),
         )
 
     def tooltip(self) -> str:
         """One line for the tray, which has room for nothing more."""
         view = self.view()
         if view.state is TimerState.ON_BREAK:
-            return translate(TRAY, "Ocura — on a break, %1 left").replace("%1", view.countdown_text)
+            return translate("Tray", "Ocura — on a break, %1 left").replace(
+                "%1", view.countdown_text
+            )
         if view.waiting_reason:
-            return translate(TRAY, "Ocura — waiting, %1").replace("%1", view.waiting_reason)
+            return translate("Tray", "Ocura — waiting, %1").replace("%1", view.waiting_reason)
         if view.state is TimerState.PRE_BREAK:
-            return translate(TRAY, "Ocura — break in %1").replace("%1", view.countdown_text)
+            return translate("Tray", "Ocura — break in %1").replace("%1", view.countdown_text)
         if view.state is TimerState.PAUSED:
-            return translate(TRAY, "Ocura — reminders paused")
+            return translate("Tray", "Ocura — reminders paused")
         if view.state is TimerState.IDLE:
-            return translate(TRAY, "Ocura — not running")
-        return translate(TRAY, "Ocura — next break in %1").replace("%1", view.countdown_text)
+            return translate("Tray", "Ocura — not running")
+        return translate("Tray", "Ocura — next break in %1").replace("%1", view.countdown_text)
 
     # --- internals ---------------------------------------------------------
 
@@ -319,45 +343,45 @@ class BreakPresenter:
         match state:
             case TimerState.IDLE:
                 return (
-                    translate(STATUS, "Not running"),
-                    translate(STATUS, "Start a session when you are ready."),
+                    translate("Status", "Not running"),
+                    translate("Status", "Start a session when you are ready."),
                 )
             case TimerState.FOCUSING:
                 return (
-                    translate(STATUS, "Focusing"),
-                    translate(STATUS, "Next break in %1.").replace("%1", clock_text(focus_left)),
+                    translate("Status", "Focusing"),
+                    translate("Status", "Next break in %1.").replace("%1", clock_text(focus_left)),
                 )
             case TimerState.PRE_BREAK:
                 return (
-                    translate(STATUS, "Break soon"),
-                    translate(STATUS, "In %1. Finish your thought.").replace(
+                    translate("Status", "Break soon"),
+                    translate("Status", "In %1. Finish your thought.").replace(
                         "%1", clock_text(focus_left)
                     ),
                 )
             case TimerState.BREAK_DUE:
                 return (
-                    translate(STATUS, "Break ready"),
-                    translate(STATUS, "Whenever suits you."),
+                    translate("Status", "Break ready"),
+                    translate("Status", "Whenever suits you."),
                 )
             case TimerState.ON_BREAK:
                 return (
-                    translate(STATUS, "On a break"),
-                    translate(STATUS, "%1 left. Look somewhere far away.").replace(
+                    translate("Status", "On a break"),
+                    translate("Status", "%1 left. Look somewhere far away.").replace(
                         "%1", clock_text(break_left)
                     ),
                 )
             case TimerState.PAUSED:
                 return (
-                    translate(STATUS, "Reminders paused"),
-                    translate(STATUS, "Nothing is counting. Resume when you like."),
+                    translate("Status", "Reminders paused"),
+                    translate("Status", "Nothing is counting. Resume when you like."),
                 )
             case TimerState.DEFERRED:
-                headline = translate(STATUS, "Waiting for a good moment")
+                headline = translate("Status", "Waiting for a good moment")
                 if self._waiting_reason:
-                    return headline, translate(STATUS, "Break owed — %1.").replace(
-                        "%1", self._waiting_reason
+                    return headline, translate("Status", "Break owed — %1.").replace(
+                        "%1", reasons.phrase(self._waiting_reason)
                     )
-                return headline, translate(STATUS, "Break owed.")
+                return headline, translate("Status", "Break owed.")
 
     def _keep(self, event: SessionEvent) -> None:
         """Persistence is best-effort. The break engine is not.
@@ -387,7 +411,7 @@ class BreakPresenter:
                 case SessionEventKind.BREAK_DEFERRED:
                     self._waiting_reason = event.detail or None
                 case SessionEventKind.BREAK_SNOOZED:
-                    self._waiting_reason = "postponed"
+                    self._waiting_reason = reasons.POSTPONED
                 # A break ended early is still a break that happened, and the
                 # count means "breaks that happened". The two kinds diverge in
                 # the log, which is where the difference is a fact worth
@@ -415,30 +439,34 @@ class BreakPresenter:
         # the list read as though something happened when nothing did.
         match event.kind:
             case SessionEventKind.STARTED:
-                return translate(EVENTS, "Session started")
+                return translate("Events", "Session started")
             case SessionEventKind.BREAK_STARTED | SessionEventKind.BREAK_STARTED_BY_USER:
-                return translate(EVENTS, "Break started")
+                return translate("Events", "Break started")
             case SessionEventKind.BREAK_COMPLETED | SessionEventKind.BREAK_SKIPPED:
                 # Deliberately the same sentence for both. Ocura does not force
                 # breaks, and a list that announced a shorter one differently
                 # would be commenting on a choice it has no business having an
                 # opinion about.
-                return translate(EVENTS, "Break finished")
+                return translate("Events", "Break finished")
             case SessionEventKind.BREAK_DEFERRED:
                 if event.detail:
-                    return translate(EVENTS, "Waiting — %1").replace("%1", event.detail)
-                return translate(EVENTS, "Waiting for a good moment")
+                    return translate("Events", "Waiting — %1").replace(
+                        "%1", reasons.phrase(event.detail)
+                    )
+                return translate("Events", "Waiting for a good moment")
             case SessionEventKind.BREAK_SNOOZED:
-                return translate(EVENTS, "Break postponed")
+                return translate("Events", "Break postponed")
             case SessionEventKind.BREAK_SATISFIED:
                 if event.detail:
-                    return translate(EVENTS, "Rest credited — %1").replace("%1", event.detail)
-                return translate(EVENTS, "Rest credited")
+                    return translate("Events", "Rest credited — %1").replace(
+                        "%1", reasons.phrase(event.detail)
+                    )
+                return translate("Events", "Rest credited")
             case SessionEventKind.PAUSED:
-                return translate(EVENTS, "Reminders paused")
+                return translate("Events", "Reminders paused")
             case SessionEventKind.RESUMED:
-                return translate(EVENTS, "Reminders resumed")
+                return translate("Events", "Reminders resumed")
             case SessionEventKind.STOPPED:
-                return translate(EVENTS, "Session stopped")
+                return translate("Events", "Session stopped")
             case _:
                 return None

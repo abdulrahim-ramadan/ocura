@@ -24,23 +24,31 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.onboarding import Onboarding, OnboardingView, Step
 from ocura.application.settings import InvalidSettings, Settings
 from ocura.ui.theme import SPACING
 from ocura.ui.views import _label
 
 DIALOG_WIDTH = 620
-DIALOG_HEIGHT = 480
+
+#: A floor, not the height. The dialog is sized to whichever of the three
+#: screens needs the most room *in the language it is about to be read in* —
+#: the German welcome is four lines where the English one is three, and a
+#: dialog fixed at the English height clipped the descenders off the last
+#: rhythm option. Measured rather than padded: a number chosen to look safe in
+#: German is a number that is wrong in the next language added.
+DIALOG_MIN_HEIGHT = 480
 
 #: The custom option on the rhythm screen. Not a spin box: first run is three
 #: questions with obvious answers, and the place to type a number is Settings,
 #: where every other number already lives and the refusals are already handled.
-CUSTOM_LABEL = "Something else — I will set it in Settings"
+CUSTOM_LABEL = QT_TRANSLATE_NOOP("OnboardingDialog", "Something else — I will set it in Settings")
 
 #: The rhythm buttons. A whole sentence per button rather than a number with
 #: "Every" glued to the front: German puts the unit differently and Arabic
 #: reads the other way, and neither can be fixed from a fragment.
-RHYTHM_LABEL = "Every %1 minutes"
+RHYTHM_LABEL = QT_TRANSLATE_NOOP("OnboardingDialog", "Every %1 minutes")
 
 
 class OnboardingDialog(QDialog):
@@ -56,7 +64,10 @@ class OnboardingDialog(QDialog):
         self.setWindowTitle(self.tr("Welcome to Ocura"))
         self.setObjectName("Onboarding")
         self.setModal(True)
-        self.resize(DIALOG_WIDTH, DIALOG_HEIGHT)
+        self.resize(DIALOG_WIDTH, DIALOG_MIN_HEIGHT)
+        #: True while the three screens are being measured, so that rendering
+        #: one does not look like the user answering it.
+        self._measuring = False
 
         self._position = _label("", "OnboardingStep")
         self._title = _label("", "OnboardingTitle")
@@ -122,6 +133,11 @@ class OnboardingDialog(QDialog):
         self._back.clicked.connect(self._on_back)
         self._advance.clicked.connect(self._on_advance)
         self._autostart_yes.toggled.connect(self._on_autostart)
+        # Once, here, rather than each time the rhythm screen is built: the
+        # group outlives its buttons, so connecting it per build left one
+        # connection per visit and `_on_rhythm` running four times on the
+        # fourth. It also makes the screens safe to render for measurement.
+        self._rhythms.idToggled.connect(self._on_rhythm)
 
     # --- rendering ---------------------------------------------------------
 
@@ -137,6 +153,7 @@ class OnboardingDialog(QDialog):
         self._autostart_yes.setText(self.tr("Yes, start Ocura when I sign in"))
         self._autostart_no.setText(self.tr("No, I will start it myself"))
         self.render(self._flow.view())
+        self._fit_to_the_tallest_screen()
 
     def changeEvent(self, event) -> None:
         if event.type() == QEvent.Type.LanguageChange:
@@ -159,6 +176,36 @@ class OnboardingDialog(QDialog):
         elif view.step is Step.AUTOSTART:
             self._build_autostart(view)
 
+    def _fit_to_the_tallest_screen(self) -> None:
+        """Grow to fit the longest of the three screens, then stay there.
+
+        Each screen is rendered into this dialog and measured, because the
+        height a paragraph needs is a question about the font, the width and
+        the words — and Qt is the only thing here that knows all three. A
+        scratch flow is walked rather than the real one, so measuring answers
+        nothing on the user's behalf, and `_measuring` stops a rendered radio
+        button from being read as a choice.
+
+        Done once per language rather than per screen: a dialog that changed
+        height on Next would be the product doing exactly the jumping about it
+        exists to prevent.
+        """
+        self._measuring = True
+        try:
+            probe = Onboarding(self._flow.settings)
+            tallest = DIALOG_MIN_HEIGHT
+            for _ in Step:
+                self.render(probe.view())
+                self.layout().activate()
+                tallest = max(tallest, self.layout().minimumHeightForWidth(DIALOG_WIDTH))
+                probe.next()
+            self.render(self._flow.view())
+        finally:
+            self._measuring = False
+
+        self.setMinimumHeight(tallest)
+        self.resize(DIALOG_WIDTH, tallest)
+
     def _clear_choices(self) -> None:
         while self._choice_layout.count():
             item = self._choice_layout.takeAt(0)
@@ -173,7 +220,9 @@ class OnboardingDialog(QDialog):
 
     def _build_rhythms(self, view: OnboardingView) -> None:
         for index, minutes in enumerate(view.rhythm_choices):
-            button = QRadioButton(self.tr(RHYTHM_LABEL).replace("%1", str(minutes)))
+            button = QRadioButton(
+                translate("OnboardingDialog", RHYTHM_LABEL).replace("%1", str(minutes))
+            )
             button.setObjectName("OnboardingChoice")
             button.setChecked(minutes == view.chosen_minutes)
             self._rhythms.addButton(button, minutes)
@@ -181,7 +230,7 @@ class OnboardingDialog(QDialog):
             if index == 0:
                 button.setToolTip(self.tr("The 20-20-20 guideline"))
 
-        custom = QRadioButton(self.tr(CUSTOM_LABEL))
+        custom = QRadioButton(translate("OnboardingDialog", CUSTOM_LABEL))
         custom.setObjectName("OnboardingChoice")
         custom.setChecked(view.chosen_minutes not in view.rhythm_choices)
         # Id 0, which no rhythm can have: choosing it changes nothing now and
@@ -189,7 +238,6 @@ class OnboardingDialog(QDialog):
         self._rhythms.addButton(custom, 0)
         self._choice_layout.addWidget(custom)
 
-        self._rhythms.idToggled.connect(self._on_rhythm)
         self._choices.setVisible(True)
 
     def _build_autostart(self, view: OnboardingView) -> None:
@@ -203,7 +251,7 @@ class OnboardingDialog(QDialog):
     # --- answers -----------------------------------------------------------
 
     def _on_rhythm(self, minutes: int, checked: bool) -> None:
-        if not checked or minutes <= 0:
+        if self._measuring or not checked or minutes <= 0:
             return
         try:
             self._flow.choose_rhythm(minutes)
@@ -214,6 +262,8 @@ class OnboardingDialog(QDialog):
             return
 
     def _on_autostart(self, enabled: bool) -> None:
+        if self._measuring:
+            return
         self._flow.set_autostart(enabled)
 
     def _on_back(self) -> None:

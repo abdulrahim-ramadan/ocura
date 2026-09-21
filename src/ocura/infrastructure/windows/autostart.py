@@ -19,6 +19,16 @@ import sys
 from collections.abc import Callable
 
 from ocura.application.autostart import AutostartUnavailable
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
+
+#: Shown under the checkbox that failed, so it is language rather than a log
+#: line: what happened, and the one thing the reader can do about it without
+#: Ocura's help.
+REFUSED_BY_WINDOWS = QT_TRANSLATE_NOOP(
+    "Autostart",
+    "Windows would not let Ocura change its start-up entry. "
+    "You can add or remove it yourself in Task Manager, under Startup.",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,10 +121,7 @@ class RegistryAutostart:
                     with contextlib.suppress(FileNotFoundError):
                         self._delete(key, VALUE_NAME)
         except OSError as exc:
-            raise AutostartUnavailable(
-                "Windows would not let Ocura change its start-up entry. "
-                "You can add or remove it yourself in Task Manager, under Startup."
-            ) from exc
+            raise AutostartUnavailable(translate("Autostart", REFUSED_BY_WINDOWS)) from exc
 
 
 def build_autostart() -> RegistryAutostart:

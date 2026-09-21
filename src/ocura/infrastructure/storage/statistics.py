@@ -29,7 +29,7 @@ import sqlite3
 from collections import Counter
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
-from ocura.application.i18n import QT_TRANSLATE_NOOP
+from ocura.application.reasons import normalise
 from ocura.application.session import SessionEventKind
 from ocura.application.statistics import (
     WINDOW_DAYS,
@@ -44,37 +44,12 @@ from ocura.infrastructure.storage.errors import StorageError
 #: page is not the place to start having an opinion about its length.
 _BREAK_HAPPENED = (SessionEventKind.BREAK_COMPLETED, SessionEventKind.BREAK_SKIPPED)
 
-#: Raw detector reasons, folded to the family they belong to. The idle detector
-#: writes the measured seconds into its reason — "idle for 312s" — so grouping
-#: on the raw string would produce one bucket per deferral and a list nobody
-#: can read. Matched by prefix and kept in one place so a detector's wording
-#: and this page's wording cannot drift apart silently.
-#: The family names are marked, not translated: they are grouped, counted and
-#: sorted as source text, and turned into the reader's language only when the
-#: page renders them. Translating here would sort the list by whatever the
-#: language happened to be and group two spellings of the same family apart.
-_REASON_FAMILIES: tuple[tuple[str, str], ...] = (
-    ("idle for", QT_TRANSLATE_NOOP("Reasons", "Away from the keyboard")),
-    ("session locked", QT_TRANSLATE_NOOP("Reasons", "Screen locked")),
-    ("fullscreen or presenting", QT_TRANSLATE_NOOP("Reasons", "Fullscreen or presenting")),
-    ("screensaver running", QT_TRANSLATE_NOOP("Reasons", "Screensaver running")),
-)
-
-
-def normalise_reason(reason: str) -> str:
-    """Fold a detector's reason into its family, or pass it through unchanged.
-
-    Unknown reasons are kept verbatim rather than swept into an "Other" bucket.
-    A detector added later must show up on this page as itself on the day it
-    ships, not disappear into a total nobody can explain — the same rule that
-    makes `StoredEvent.event_kind` return None for a kind it has never heard of
-    instead of refusing to read the row.
-    """
-    folded = reason.strip().lower()
-    for prefix, family in _REASON_FAMILIES:
-        if folded.startswith(prefix):
-            return family
-    return reason.strip()
+#: The folding of a detector's raw reason into a family lives in
+#: `ocura.application.reasons`, not here. It was here first, when the
+#: statistics page was the only surface that showed a reason; the dashboard,
+#: the tray and the event list show the same reasons live, and two copies of
+#: the table would have been two vocabularies free to disagree about what a
+#: lock is called.
 
 
 class StatisticsStore:
@@ -124,7 +99,7 @@ class StatisticsStore:
             elif kind in _BREAK_HAPPENED:
                 breaks[day] += 1
             elif kind == SessionEventKind.BREAK_DEFERRED and detail:
-                reasons[normalise_reason(detail)] += 1
+                reasons[normalise(detail)] += 1
 
         return Statistics(
             days=tuple(

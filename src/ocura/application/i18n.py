@@ -93,7 +93,6 @@ def QT_TRANSLATE_NOOP(context: str, text: str) -> str:
 #: `numerus`, and Arabic has six plural forms that would then have nowhere to
 #: live. An abbreviation has one form in all three languages, and every
 #: sentence that needs a duration takes it through a `%1` placeholder instead.
-UNITS_CONTEXT = "Units"
 
 
 def duration_text(seconds: float | None) -> str:
@@ -110,16 +109,16 @@ def duration_text(seconds: float | None) -> str:
     if seconds is None or seconds <= 0:
         return "—"
     if seconds < 60:
-        return translate(UNITS_CONTEXT, "%1s").replace("%1", str(round(seconds)))
+        return translate("Units", "%1s").replace("%1", str(round(seconds)))
 
     minutes = int(seconds / 60 + 0.5)
     if minutes < 60:
-        return translate(UNITS_CONTEXT, "%1m").replace("%1", str(minutes))
+        return translate("Units", "%1m").replace("%1", str(minutes))
 
     hours, rest = divmod(minutes, 60)
     if rest == 0:
-        return translate(UNITS_CONTEXT, "%1h").replace("%1", str(hours))
-    return translate(UNITS_CONTEXT, "%1h %2m").replace("%1", str(hours)).replace("%2", str(rest))
+        return translate("Units", "%1h").replace("%1", str(hours))
+    return translate("Units", "%1h %2m").replace("%1", str(hours)).replace("%2", str(rest))
 
 
 def duration_words(seconds: float) -> str:
@@ -150,20 +149,20 @@ def duration_words(seconds: float) -> str:
     if seconds % 3600 == 0:
         hours = int(seconds // 3600)
         if hours == 1:
-            return translate(UNITS_CONTEXT, "1 hour")
-        return translate(UNITS_CONTEXT, "%1 hours").replace("%1", str(hours))
+            return translate("Units", "1 hour")
+        return translate("Units", "%1 hours").replace("%1", str(hours))
 
     if seconds % 60 == 0:
         minutes = int(seconds // 60)
         if minutes == 1:
-            return translate(UNITS_CONTEXT, "1 minute")
-        return translate(UNITS_CONTEXT, "%1 minutes").replace("%1", str(minutes))
+            return translate("Units", "1 minute")
+        return translate("Units", "%1 minutes").replace("%1", str(minutes))
 
     exact = round(seconds, 3)
     whole = int(exact) if exact == int(exact) else exact
     if whole == 1:
-        return translate(UNITS_CONTEXT, "1 second")
-    return translate(UNITS_CONTEXT, "%1 seconds").replace("%1", f"{whole:g}")
+        return translate("Units", "1 second")
+    return translate("Units", "%1 seconds").replace("%1", f"{whole:g}")
 
 
 def clock_text(seconds: float) -> str:

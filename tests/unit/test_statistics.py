@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from ocura.application.reasons import normalise
 from ocura.application.session import SessionEvent, SessionEventKind
 from ocura.application.statistics import (
     WINDOW_DAYS,
@@ -35,7 +36,6 @@ from ocura.infrastructure.storage import (
     StatisticsStore,
     StorageError,
     close_database,
-    normalise_reason,
     open_event_store,
 )
 
@@ -402,7 +402,7 @@ def test_a_deferral_outside_the_window_is_not_counted(seeded):
     ],
 )
 def test_reason_families(raw: str, family: str):
-    assert normalise_reason(raw) == family
+    assert normalise(raw) == family
 
 
 # --- the shape of no history ----------------------------------------------

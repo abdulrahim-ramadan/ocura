@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ocura.application.autostart import Autostart
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.presenter import SessionView
 from ocura.application.settings import Settings
 from ocura.application.statistics import StatisticsPresenter
@@ -22,15 +23,27 @@ from ocura.ui.statistics import StatisticsPage
 from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import DashboardView
 
-#: The sidebar sections, in order. Source text; translated on every
-#: retranslate so a language change relabels them in place.
-NAV_SECTIONS = ("Dashboard", "Statistics", "Settings")
+#: The sidebar sections, in order. Marked rather than translated here: a
+#: constant translated at import is stuck in the language Python started in.
+#: Marked *and* rendered with an explicit context rather than `self.tr`,
+#: because `tr(variable)` extracts nothing — lupdate reads the source, it does
+#: not run it, so a table of strings has to be marked where the table is
+#: written and translated where the table is read.
+NAV_SECTIONS = (
+    QT_TRANSLATE_NOOP("MainWindow", "Dashboard"),
+    QT_TRANSLATE_NOOP("MainWindow", "Statistics"),
+    QT_TRANSLATE_NOOP("MainWindow", "Settings"),
+)
 
 DEFAULT_SIZE = QSize(880, 660)
 
 #: The dashboard scrolls, so this is a comfort floor rather than a correctness
 #: one. Squeezed-text overlap is prevented structurally in DashboardView, not by
 #: forbidding small windows.
+#:
+#: The width is a floor in a second sense as well: it was measured in English,
+#: and German controls are wider, so `_fit_minimum_width` raises it to whatever
+#: the language on screen actually needs. Nothing lowers it.
 MIN_SIZE = QSize(680, 520)
 
 
@@ -125,14 +138,38 @@ class MainWindow(QMainWindow):
         for index, name in enumerate(NAV_SECTIONS):
             button = self._nav.button(index)
             if button is not None:
-                button.setText(self.tr(name))
+                button.setText(translate("MainWindow", name))
         self._theme_button.setText(
             self.tr("Light theme") if self._theme_is_dark else self.tr("Dark theme")
         )
+        self._fit_minimum_width()
+
+    def _fit_minimum_width(self) -> None:
+        """Make the window impossible to shrink past its own controls.
+
+        The page scrolls sideways if it has to — that is the safety net, and
+        it stays — but a window that cannot be made too narrow in the first
+        place is the better answer, and what "too narrow" means changes with
+        the language.
+
+        Asked again on show and on a style change, because a button's width is
+        not knowable until the stylesheet that pads it has been applied: at
+        construction the German row measures 80px narrower than it turns out
+        to be, which is exactly the margin that decides this.
+        """
+        self.setMinimumWidth(
+            max(MIN_SIZE.width(), LAYOUT.sidebar_width + self.dashboard.minimum_content_width())
+        )
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._fit_minimum_width()
 
     def changeEvent(self, event) -> None:
         if event.type() == QEvent.Type.LanguageChange:
             self.retranslate()
+        elif event.type() == QEvent.Type.StyleChange:
+            self._fit_minimum_width()
         super().changeEvent(event)
 
     def set_theme_name(self, name: str) -> None:

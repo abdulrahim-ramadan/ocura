@@ -26,11 +26,25 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol, runtime_checkable
 
-from ocura.application.i18n import duration_text, duration_words, translate
+from ocura.application.i18n import QT_TRANSLATE_NOOP, duration_text, duration_words, translate
 from ocura.domain.schedule import BreakSchedule
 
-STATISTICS = "Statistics"
-REASONS = "Reasons"
+#: Weekday names, abbreviated, indexed by `date.weekday()`. Written out and
+#: marked rather than taken from `strftime("%a")`, which answers in the
+#: process's C locale and would have put "Mon" under a German chart forever.
+#: Qt's `QLocale` would answer correctly and cannot be reached from here — this
+#: layer is banned from importing it — so the seven names go through the same
+#: catalogue as every other word in the interface, where a translator can also
+#: decide how short "Donnerstag" should be cut.
+WEEKDAYS = (
+    QT_TRANSLATE_NOOP("Calendar", "Mon"),
+    QT_TRANSLATE_NOOP("Calendar", "Tue"),
+    QT_TRANSLATE_NOOP("Calendar", "Wed"),
+    QT_TRANSLATE_NOOP("Calendar", "Thu"),
+    QT_TRANSLATE_NOOP("Calendar", "Fri"),
+    QT_TRANSLATE_NOOP("Calendar", "Sat"),
+    QT_TRANSLATE_NOOP("Calendar", "Sun"),
+)
 
 #: A week, which is the window the page reads and the one the chart draws. Long
 #: enough to show a shape, short enough that every bar is a day the user still
@@ -206,9 +220,9 @@ class StatisticsPresenter:
         today = statistics.today.day
 
         return StatisticsPageView(
-            headline=translate(STATISTICS, "The last seven days"),
+            headline=translate("Statistics", "The last seven days"),
             subheading=translate(
-                STATISTICS,
+                "Statistics",
                 "What Ocura recorded while it was running. "
                 "Times are counted in focus blocks that finished.",
             ),
@@ -222,7 +236,7 @@ class StatisticsPresenter:
             average_focus_text=duration_text(statistics.average_focus_seconds),
             bars=tuple(
                 DayBar(
-                    weekday=day.day.strftime("%a"),
+                    weekday=translate("Calendar", WEEKDAYS[day.day.weekday()]),
                     day_of_month=str(day.day.day),
                     value_text=duration_text(day.screen_seconds),
                     fraction=(day.screen_seconds / tallest) if tallest > 0 else 0.0,
@@ -230,14 +244,14 @@ class StatisticsPresenter:
                 )
                 for day in statistics.days
             ),
-            deferrals_title=translate(STATISTICS, "When Ocura waited"),
+            deferrals_title=translate("Statistics", "When Ocura waited"),
             deferrals_note=self._deferrals_note(statistics),
             deferrals=tuple(
                 DeferralLine(
                     # A reason this build has never heard of passes through
                     # untranslated, which is the same bargain the storage layer
                     # makes when it keeps an unknown family verbatim.
-                    reason=translate(REASONS, entry.reason),
+                    reason=translate("Reasons", entry.reason),
                     count_text=f"{entry.count}",
                     fraction=(entry.count / busiest) if busiest else 0.0,
                 )
@@ -254,12 +268,12 @@ class StatisticsPresenter:
         """
         if self._schedule is None:
             return translate(
-                STATISTICS,
+                "Statistics",
                 "Nothing to show yet. Ocura records a focus block once it finishes, "
                 "so the first one appears here after your first full block.",
             )
         return translate(
-            STATISTICS,
+            "Statistics",
             "Nothing to show yet. Ocura records a focus block once it finishes, so the "
             "first one appears here about %1 after you start a session. The week fills "
             "in a day at a time after that.",
@@ -269,12 +283,12 @@ class StatisticsPresenter:
         """Why the chart is not there, in the place it would have been."""
         if self._schedule is None:
             return translate(
-                STATISTICS,
+                "Statistics",
                 "No focus block has finished yet, so there is nothing to chart. "
                 "Breaks are counted above as they happen.",
             )
         return translate(
-            STATISTICS,
+            "Statistics",
             "No focus block has finished yet, so there is nothing to chart. A block is "
             "about %1; breaks are counted above as they happen.",
         ).replace("%1", duration_words(self._schedule.focus_interval))
@@ -289,7 +303,7 @@ class StatisticsPresenter:
         """
         if not statistics.deferrals:
             return translate(
-                STATISTICS,
+                "Statistics",
                 "Ocura holds a break back when the moment is wrong — while the screen is "
                 "locked, while something is fullscreen, while you are away from the keyboard. "
                 "It has not needed to yet.",
@@ -300,12 +314,12 @@ class StatisticsPresenter:
         # Arabic, and a translator handed a fragment cannot fix that.
         if total == 1:
             return translate(
-                STATISTICS,
+                "Statistics",
                 "Ocura held a break back once this week rather than interrupting, and "
                 "waited for a better moment. This is why.",
             )
         return translate(
-            STATISTICS,
+            "Statistics",
             "Ocura held a break back %1 times this week rather than interrupting, and "
             "waited for a better moment. This is why.",
         ).replace("%1", str(total))

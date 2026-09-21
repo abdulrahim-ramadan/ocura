@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ocura.application.i18n import QT_TRANSLATE_NOOP, translate
 from ocura.application.presenter import SessionView
 from ocura.ui.motion import MOTION
 from ocura.ui.theme import LAYOUT, SPACING
@@ -91,7 +92,7 @@ class DashboardView(QWidget):
         status_layout.addSpacing(SPACING.s)
         status_layout.addWidget(self._waiting)
 
-        buttons = QHBoxLayout()
+        buttons = self._buttons = QHBoxLayout()
         buttons.setSpacing(SPACING.s)
         buttons.addWidget(self._start)
         buttons.addWidget(self._pause)
@@ -104,14 +105,20 @@ class DashboardView(QWidget):
         metrics_layout.setSpacing(SPACING.xl)
         self._captions: list[tuple[QLabel, str]] = []
         for widget, caption in (
-            (self._breaks_taken, "Breaks taken"),
-            (self._rests_credited, "Rests credited"),
-            (self._focus_elapsed, "At the screen"),
+            (self._breaks_taken, QT_TRANSLATE_NOOP("DashboardView", "Breaks taken")),
+            (self._rests_credited, QT_TRANSLATE_NOOP("DashboardView", "Rests credited")),
+            (self._focus_elapsed, QT_TRANSLATE_NOOP("DashboardView", "At the screen")),
         ):
             column = QVBoxLayout()
             column.setSpacing(SPACING.xs)
             column.addWidget(widget)
             label = _label("", "MetricLabel")
+            # One line, whatever the language. The card takes exactly the
+            # height its text needs, so a caption that wraps is a caption
+            # drawn outside its own box — which is how "Durchschnittlicher
+            # Fokusblock" lost its second line in a narrow window. Unwrapped,
+            # it asks for the width it needs instead, and the page scrolls.
+            label.setWordWrap(False)
             self._captions.append((label, caption))
             column.addWidget(label)
             metrics_layout.addLayout(column)
@@ -165,7 +172,15 @@ class DashboardView(QWidget):
         scroller.setWidget(content)
         scroller.setWidgetResizable(True)
         scroller.setFrameShape(QFrame.Shape.NoFrame)
-        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # As needed rather than always off. Off was right when every string was
+        # English and fitted: it kept a long sentence wrapping instead of
+        # sliding sideways. A translated interface is wider — the German
+        # dashboard's three buttons do not fit the minimum window, and the
+        # German week chart does not either — and a control that is simply not
+        # on the screen is worse than a scrollbar. Wrapping text still wraps:
+        # a bar appears only when something that cannot wrap, such as a row of
+        # buttons, needs more room than the window has.
+        scroller.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         # The column takes the stretch so it grows to its cap, and a zero-weight
         # spacer absorbs whatever is left. Without the spacer Qt centres a
@@ -177,6 +192,17 @@ class DashboardView(QWidget):
         root.addStretch(0)
         self.retranslate()
 
+    def minimum_content_width(self) -> int:
+        """The narrowest this page can be and still show all three controls.
+
+        Buttons are the one thing on the page that cannot wrap, and their
+        width is a fact about the language: "Erinnerungen pausieren" is half
+        again as wide as "Pause reminders". The window asks for this after
+        every language change rather than trusting a minimum size that was
+        measured once, in English.
+        """
+        return self._buttons.sizeHint().width() + 2 * SPACING.lg
+
     def retranslate(self) -> None:
         """Re-set every string this widget owns, in the language now active.
 
@@ -186,7 +212,7 @@ class DashboardView(QWidget):
         the next tick, and it is not this widget's to decide.
         """
         for label, caption in self._captions:
-            label.setText(self.tr(caption))
+            label.setText(translate("DashboardView", caption))
         self._events_title.setText(self.tr("This session"))
         self._break.setText(self.tr("Take a break now"))
         self._retranslate_buttons()

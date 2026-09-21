@@ -1079,6 +1079,108 @@ user has an application, not a checkout, and a path they cannot open is not an
 attribution. The organisations are named instead, which is the part that can
 actually be followed up.
 
+## P6 — languages
+
+Arabic, German and English, through Qt Linguist, with the source strings in
+English and no catalogue for it.
+
+### Translation is a port, not a Qt call
+
+Most of what Ocura says is decided in `application/`, because the rules about
+it — calm, informational, never accusatory — are a product decision that
+`tests/unit/` asserts without a display. That layer is banned from importing
+PySide6, so `QObject.tr` is not available to it.
+
+`application/i18n.py` is the seam: an ordinary `translate(context, text)` that
+delegates to whatever translator is installed. `NullTranslator` returns the
+source string, which is English, which is why every headless test kept passing
+unchanged when the strings were wrapped. `ui/language.py` installs the Qt one,
+so both layers read one catalogue.
+
+**`pyside6-lupdate` extracts from it.** A bare `translate("Context", "text")`
+call is a shape it recognises in a file that never imports Qt — verified
+before any of this was designed, because the whole arrangement depends on it.
+`scripts/update_translations.py` runs it over **every** module under
+`src/ocura`, not only the UI.
+
+Two rules follow from how lupdate works, and both were learned by getting them
+wrong first:
+
+- **The context must be a literal at the call site.** `translate(STATUS, ...)`
+  with `STATUS = "Status"` extracts nothing at all: lupdate reads the source,
+  it does not run it. The first catalogue came out with the entire application
+  layer missing.
+- **Nothing is translated at import.** A module constant translated when
+  Python first reads the file is fixed to the language the process started in,
+  which is the bug that makes a language switch look like it half-worked.
+  Constants are marked with `QT_TRANSLATE_NOOP` and passed through `translate`
+  where they are rendered.
+
+### The language changes without a restart
+
+Installing a `QTranslator` makes Qt post `LanguageChange` to every widget, and
+each one answers it by re-setting the strings it owns. Everything else on
+screen is rendered from a presenter, so the next tick carries it. Two things
+Qt does not reach are told directly: the tray, which is a `QObject` rather than
+a widget, and the statistics page, which is a query rather than a tick.
+
+It was worth checking rather than claiming. The alternative — "a restart is
+required" — was on the table and is not needed.
+
+### What the translation pass found
+
+Wrapping strings is the easy half. Running the application in German is what
+found the rest, and each one was invisible to a test that only read English:
+
+| Defect | Why no test saw it |
+|---|---|
+| The pre-break toast said "A break in 0:20" in every language | An f-string built in `OcuraApp` and handed to a widget method of Ocura's own, so no Qt text setter was involved |
+| The break screen's evidence line stayed English | The constant was marked with `QT_TRANSLATE_NOOP` and never passed through `translate` |
+| "Waiting — session locked" on the dashboard, the tray and the event list | A detector's reason is vocabulary, and nothing folded it into language on the way to a screen |
+| "Mon" under a German chart | `strftime("%a")` answers in the process's C locale |
+| Two autostart failures | Raised in layers with no widgets, so they read as exceptions rather than as sentences |
+
+`tests/unit/test_no_bare_strings.py` now carries three rules instead of one,
+and the second and third exist because of that table.
+
+### Detector reasons are folded before they are translated
+
+`application/reasons.py` maps a detector's raw words — `session locked`,
+`idle for 312s` — onto a small set of families, marked for translation. The
+order matters in both directions:
+
+- **The log keeps the detector's words, never the reader's.** A history
+  written in German and read in Arabic has to still mean the same thing, so
+  nothing translated is ever persisted.
+- **The folding happens before the translation.** The statistics page groups
+  and counts these; grouping translated strings would split one family into
+  two rows, or group differently depending on the language the window was in.
+
+### Numbers stay in Western digits
+
+`clock_text` formats the countdown with Python rather than `QLocale`. The
+countdown is read at a glance from the corner of the eye, and a script the
+reader has to parse is not a glance. Arabic-Indic digits are correct for Arabic
+prose and wrong for a timer. Everything else — the spin boxes, a day of the
+month — follows whatever `QLocale` the machine is set to, because that is a
+decision the user already made about their own computer.
+
+### German is longer, and it clipped three things
+
+Checked by rendering, at the default window size and at the minimum, in all
+three languages:
+
+| Where | What happened | Fix |
+|---|---|---|
+| First-run dialog, rhythm screen | The German body runs to four lines where English runs to three; at a fixed 480px the last option's descenders were cut off | The dialog measures all three screens in the language it is about to be read in and sizes itself to the tallest |
+| Dashboard, at the minimum window size | "Jetzt Pause machen" was off the right edge; the English row fits with 30px to spare | The window's minimum width is computed from the width the button row actually needs, after the stylesheet has been applied |
+| Statistics metric captions | "Durchschnittlicher Fokusblock" wrapped to two lines inside a card whose height is fixed to one | Captions do not wrap; the page scrolls sideways if a language needs the room |
+
+The three pages' horizontal scrollbars changed from `AlwaysOff` to
+`AsNeeded` as the safety net under all of it. Off was right while every string
+was English and fitted. A control that is simply not on the screen is worse
+than a scrollbar, and no number chosen today survives the next language.
+
 ## Known limitation: fullscreen on a non-primary display
 
 `SHQueryUserNotificationState` watches the primary display only. Measured on a

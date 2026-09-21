@@ -1,0 +1,904 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TS>
+<TS version="2.1" language="ar_EG">
+<context>
+    <name>Autostart</name>
+    <message>
+        <location filename="../../application/autostart.py" line="23"/>
+        <source>Ocura cannot manage startup entries on this machine.</source>
+        <translation>لا يستطيع Ocura إدارة عناصر بدء التشغيل على هذا الجهاز.</translation>
+    </message>
+    <message>
+        <location filename="../../infrastructure/windows/autostart.py" line="27"/>
+        <source>Windows would not let Ocura change its start-up entry. You can add or remove it yourself in Task Manager, under Startup.</source>
+        <translation>لم يسمح Windows لـ Ocura بتغيير عنصر بدء التشغيل الخاص به. يمكنك إضافته أو إزالته بنفسك من مدير المهام، ضمن علامة التبويب «بدء التشغيل».</translation>
+    </message>
+</context>
+<context>
+    <name>BreakScreen</name>
+    <message>
+        <location filename="../break_screen.py" line="290"/>
+        <source>Look at something far away</source>
+        <extracomment>The band the shape is given, as a fraction of the overlay&apos;s height, and at full scale its painted extent as well — the box hugs the shape rather than containing it. A box larger than what it draws put two hundred pixels of nothing between the shape and its own instruction, which is what made the text look stranded at the bottom of the screen. Taken from the overlay&apos;s height rather than from whatever the layout has left over, so the shape is the same size on a display whatever the text below it does. How far it recedes by the end of the break. Radial stops, from the centre outwards, as (position, alpha). Solid well past the middle and gone by the rim: the shape is a disc with an edge that cannot be located, not a blur. A findable edge is a luminance step, and a luminance step is what the eye fixates on instead of the distance. The cue at rest, as a fraction of the overlay&apos;s width. About a third: a full-width line is a divider, and a divider is furniture the eye stops seeing after the first blink. Thick enough to read as a lid rather than as a rule. What is left of it between blinks. Not zero — a cue that vanished entirely would have to arrive from nowhere — but far below the threshold where a still line starts to look like part of the layout. How quickly it becomes fully visible once it starts to close. Past the first third of the movement it is at full strength, so the closing reads as a lid coming down rather than as something fading up. Stretch weights for the empty space above and below the group. Unequal on purpose: the group sits in the upper third, which is where a distant object would be, and the larger share of the emptiness falls below it. Animated by ocura.ui.motion; nothing else writes it. 1.0 is open, 0.0 is a closed lid.</extracomment>
+        <translation>انظر إلى شيء بعيد</translation>
+    </message>
+    <message>
+        <location filename="../break_screen.py" line="293"/>
+        <source>Skip</source>
+        <translation>إنهاء</translation>
+    </message>
+    <message>
+        <location filename="../break_screen.py" line="294"/>
+        <source>Later</source>
+        <translation>لاحقًا</translation>
+    </message>
+</context>
+<context>
+    <name>BreakToast</name>
+    <message>
+        <location filename="../toast.py" line="90"/>
+        <source>Look at something far away when it arrives.</source>
+        <extracomment>Long enough to read, short enough not to become furniture. The warning also closes itself when the break arrives, whichever comes first. Clear of the tray without touching the screen edge.</extracomment>
+        <translation>انظر إلى شيء بعيد عندما تبدأ.</translation>
+    </message>
+    <message>
+        <location filename="../toast.py" line="91"/>
+        <source>Not now</source>
+        <translation>ليس الآن</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="311"/>
+        <source>A break in %1</source>
+        <extracomment>Set only while a break is owed and something is in the way. The pre-break warning is showing. One state, one moment to fire on. The break overlay should be on screen. Driven by ON_BREAK and nothing else — never by BREAK_DUE, which is a decision point, not an occurrence. False once the cap is reached, so a view can drop the control rather than offer an action that would be refused. False when no session is running, so a view can disable the control rather than offer an action that would be refused. The evidence line for the break screen. Chosen here rather than in the widget: it is language, and the language rules are testable without a display. Stable for the whole of one break, since it is keyed to the count of breaks finished and that does not move while one is running. The one sentence on the pre-break toast. Here rather than assembled in `OcuraApp` from an f-string, which is what it was and which meant the one message that has to arrive before a break was the one message no translator ever saw. Empty whenever the warning is not showing.</extracomment>
+        <translation>استراحة بعد %1</translation>
+    </message>
+</context>
+<context>
+    <name>Calendar</name>
+    <message>
+        <location filename="../../application/statistics.py" line="40"/>
+        <source>Mon</source>
+        <extracomment>Weekday names, abbreviated, indexed by `date.weekday()`. Written out and marked rather than taken from `strftime(&quot;%a&quot;)`, which answers in the process&apos;s C locale and would have put &quot;Mon&quot; under a German chart forever. Qt&apos;s `QLocale` would answer correctly and cannot be reached from here — this layer is banned from importing it — so the seven names go through the same catalogue as every other word in the interface, where a translator can also decide how short &quot;Donnerstag&quot; should be cut.</extracomment>
+        <translation>إثنين</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="41"/>
+        <source>Tue</source>
+        <translation>ثلاثاء</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="42"/>
+        <source>Wed</source>
+        <translation>أربعاء</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="43"/>
+        <source>Thu</source>
+        <translation>خميس</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="44"/>
+        <source>Fri</source>
+        <translation>جمعة</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="45"/>
+        <source>Sat</source>
+        <translation>سبت</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="46"/>
+        <source>Sun</source>
+        <translation>أحد</translation>
+    </message>
+</context>
+<context>
+    <name>DashboardView</name>
+    <message>
+        <location filename="../views.py" line="108"/>
+        <source>Breaks taken</source>
+        <translation>الاستراحات المأخوذة</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="109"/>
+        <source>Rests credited</source>
+        <translation>الراحة المحتسبة</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="110"/>
+        <source>At the screen</source>
+        <translation>أمام الشاشة</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="216"/>
+        <source>This session</source>
+        <translation>هذه الجلسة</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="217"/>
+        <source>Take a break now</source>
+        <translation>خذ استراحة الآن</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="223"/>
+        <source>Restart session</source>
+        <translation>إعادة تشغيل الجلسة</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="223"/>
+        <source>Start session</source>
+        <translation>بدء جلسة</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="226"/>
+        <source>Resume reminders</source>
+        <translation>استئناف التنبيهات</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="226"/>
+        <source>Pause reminders</source>
+        <translation>إيقاف التنبيهات مؤقتًا</translation>
+    </message>
+    <message>
+        <location filename="../views.py" line="247"/>
+        <source>Waiting — %1</source>
+        <translation>في الانتظار — %1</translation>
+    </message>
+</context>
+<context>
+    <name>Events</name>
+    <message>
+        <location filename="../../application/presenter.py" line="442"/>
+        <source>Session started</source>
+        <translation>بدأت الجلسة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="444"/>
+        <source>Break started</source>
+        <translation>بدأت الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="450"/>
+        <source>Break finished</source>
+        <translation>انتهت الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="453"/>
+        <source>Waiting — %1</source>
+        <translation>في الانتظار — %1</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="456"/>
+        <source>Waiting for a good moment</source>
+        <translation>في انتظار لحظة مناسبة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="458"/>
+        <source>Break postponed</source>
+        <translation>أُجّلت الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="461"/>
+        <source>Rest credited — %1</source>
+        <translation>احتُسبت الراحة — %1</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="464"/>
+        <source>Rest credited</source>
+        <translation>احتُسبت الراحة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="466"/>
+        <source>Reminders paused</source>
+        <translation>أُوقفت التنبيهات مؤقتًا</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="468"/>
+        <source>Reminders resumed</source>
+        <translation>استؤنفت التنبيهات</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="470"/>
+        <source>Session stopped</source>
+        <translation>توقفت الجلسة</translation>
+    </message>
+</context>
+<context>
+    <name>MainWindow</name>
+    <message>
+        <location filename="../main_window.py" line="33"/>
+        <source>Dashboard</source>
+        <extracomment>The sidebar sections, in order. Marked rather than translated here: a constant translated at import is stuck in the language Python started in. Marked *and* rendered with an explicit context rather than `self.tr`, because `tr(variable)` extracts nothing — lupdate reads the source, it does not run it, so a table of strings has to be marked where the table is written and translated where the table is read.</extracomment>
+        <translation>اللوحة</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="34"/>
+        <source>Statistics</source>
+        <translation>الإحصاءات</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="35"/>
+        <source>Settings</source>
+        <translation>الإعدادات</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="136"/>
+        <source>Ocura</source>
+        <extracomment>The dashboard scrolls, so this is a comfort floor rather than a correctness one. Squeezed-text overlap is prevented structurally in DashboardView, not by forbidding small windows. The width is a floor in a second sense as well: it was measured in English, and German controls are wider, so `_fit_minimum_width` raises it to whatever the language on screen actually needs. Nothing lowers it. The index of the Statistics page in both the sidebar and the stack. One constant rather than a literal in each: they have to agree, and a pair of bare 1s is exactly the kind of agreement that quietly stops holding.</extracomment>
+        <translation>Ocura</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="137"/>
+        <source>Better screen habits.</source>
+        <translation>عادات أفضل أمام الشاشة.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="143"/>
+        <location filename="../main_window.py" line="178"/>
+        <source>Light theme</source>
+        <translation>مظهر فاتح</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="143"/>
+        <location filename="../main_window.py" line="178"/>
+        <source>Dark theme</source>
+        <translation>مظهر داكن</translation>
+    </message>
+</context>
+<context>
+    <name>Onboarding</name>
+    <message>
+        <location filename="../../application/onboarding.py" line="48"/>
+        <source>Ocura watches the clock so you do not have to</source>
+        <extracomment>What each screen says. Kept here with the machine that shows them for the same reason the dashboard&apos;s language lives in the presenter: it is a product decision, and a widget test cannot assert a sentence without a display. The second paragraph, where a screen has one to add.</extracomment>
+        <translation>Ocura يراقب الوقت بدلًا عنك</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="49"/>
+        <source>Ocura times how long you have been at the screen and offers you a short break when one is due. It tries hard not to interrupt at a bad moment: while your screen is locked, while something is running full screen, or while you are away from the keyboard, it waits and offers the break later.</source>
+        <translation>يقيس Ocura المدة التي قضيتها أمام الشاشة، ويعرض عليك استراحة قصيرة عندما يحين وقتها. وهو يحرص على ألّا يقاطعك في لحظة غير مناسبة: فإذا كانت الشاشة مقفلة، أو كان هناك تطبيق يعمل بملء الشاشة، أو كنت بعيدًا عن لوحة المفاتيح، فإنه ينتظر ويعرض الاستراحة لاحقًا.</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="56"/>
+        <source>You can always postpone a break or end one early — Ocura never locks you out of your own machine. It is a wellness and productivity tool, not a medical device. It does not diagnose anything and makes no medical claims.</source>
+        <translation>يمكنك دائمًا تأجيل الاستراحة أو إنهاؤها مبكرًا — فـ Ocura لا يمنعك أبدًا من استخدام جهازك. وهو أداة للعافية والإنتاجية، وليس جهازًا طبيًا. لا يُشخّص شيئًا ولا يقدم أي ادعاءات طبية.</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="70"/>
+        <source>Pick a rhythm</source>
+        <extracomment>The sentence on this screen is sourced from docs/EVIDENCE.md, which records who makes the claim and how strong it is. The file is not named on screen: a user has an application, not a checkout, and a path they cannot open is not an attribution. The organisations are named instead, which is the part that can actually be followed up.</extracomment>
+        <translation>اختر إيقاعًا</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="71"/>
+        <source>Every 20 minutes, look at something about 20 feet away for 20 seconds. That is the 20-20-20 guideline, recommended by the American Academy of Ophthalmology and the American Optometric Association as an easy rhythm to remember rather than as a result from a trial.</source>
+        <translation>كل 20 دقيقة، انظر لمدة 20 ثانية إلى شيء يبعد نحو 6 أمتار. هذه قاعدة 20-20-20، توصي بها الأكاديمية الأمريكية لطب العيون والجمعية الأمريكية للبصريات بوصفها إيقاعًا سهل التذكر، لا نتيجةً لتجربة سريرية.</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="78"/>
+        <source>Twenty minutes is the guideline, and the longer options are here because a rhythm you will actually keep beats one you turn off by lunchtime. You can change this whenever you like in Settings.</source>
+        <translation>العشرون دقيقة هي التوصية، والخيارات الأطول موجودة لأن إيقاعًا تلتزم به فعلًا خير من إيقاع تُطفئه عند الظهر. يمكنك تغيير ذلك متى شئت من الإعدادات.</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="87"/>
+        <source>Start Ocura when you sign in?</source>
+        <translation>هل يبدأ Ocura عند تسجيل الدخول؟</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="88"/>
+        <source>Ocura only helps on the days it is running, so most people want it to start when they sign in. It starts minimised to the notification area and does not open a window.</source>
+        <translation>لا ينفع Ocura إلا في الأيام التي يعمل فيها، لذلك يفضّل معظم الناس أن يبدأ عند تسجيل الدخول. يبدأ مصغّرًا في منطقة الإشعارات ولا يفتح أي نافذة.</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="94"/>
+        <source>Asked rather than assumed. If you say no, nothing is added to your startup list and you can turn this on later in Settings. If you say yes, you can still remove it yourself from Task Manager, under Startup.</source>
+        <translation>سؤال، لا افتراض. إن قلت لا، فلن يُضاف شيء إلى قائمة بدء التشغيل، ويمكنك تفعيل ذلك لاحقًا من الإعدادات. وإن قلت نعم، يبقى بإمكانك إزالته بنفسك من إدارة المهام، تحت بدء التشغيل.</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="107"/>
+        <location filename="../../application/onboarding.py" line="108"/>
+        <source>Next</source>
+        <extracomment>The label on the button that leaves each screen. The last one commits, and says so: &quot;Next&quot; on a final screen is a button that hides what it does.</extracomment>
+        <translation>التالي</translation>
+    </message>
+    <message>
+        <location filename="../../application/onboarding.py" line="109"/>
+        <source>Start using Ocura</source>
+        <translation>ابدأ استخدام Ocura</translation>
+    </message>
+</context>
+<context>
+    <name>OnboardingDialog</name>
+    <message>
+        <location filename="../onboarding.py" line="46"/>
+        <source>Something else — I will set it in Settings</source>
+        <extracomment>A floor, not the height. The dialog is sized to whichever of the three screens needs the most room *in the language it is about to be read in* — the German welcome is four lines where the English one is three, and a dialog fixed at the English height clipped the descenders off the last rhythm option. Measured rather than padded: a number chosen to look safe in German is a number that is wrong in the next language added. The custom option on the rhythm screen. Not a spin box: first run is three questions with obvious answers, and the place to type a number is Settings, where every other number already lives and the refusals are already handled.</extracomment>
+        <translation>شيء آخر — سأضبطه من الإعدادات</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="51"/>
+        <source>Every %1 minutes</source>
+        <extracomment>The rhythm buttons. A whole sentence per button rather than a number with &quot;Every&quot; glued to the front: German puts the unit differently and Arabic reads the other way, and neither can be fixed from a fragment.</extracomment>
+        <translation>كل %1 دقيقة</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="64"/>
+        <location filename="../onboarding.py" line="151"/>
+        <source>Welcome to Ocura</source>
+        <extracomment>The finished settings. Emitted once, on the last screen&apos;s button.
+----------
+True while the three screens are being measured, so that rendering one does not look like the user answering it.</extracomment>
+        <translation>مرحبًا بك في Ocura</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="152"/>
+        <source>Back</source>
+        <translation>رجوع</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="153"/>
+        <source>Yes, start Ocura when I sign in</source>
+        <translation>نعم، ابدأ Ocura عند تسجيل دخولي</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="154"/>
+        <source>No, I will start it myself</source>
+        <translation>لا، سأشغّله بنفسي</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="165"/>
+        <source>%1 of %2</source>
+        <translation>%1 من %2</translation>
+    </message>
+    <message>
+        <location filename="../onboarding.py" line="231"/>
+        <source>The 20-20-20 guideline</source>
+        <translation>قاعدة 20-20-20</translation>
+    </message>
+</context>
+<context>
+    <name>Reasons</name>
+    <message>
+        <location filename="../../application/reasons.py" line="47"/>
+        <source>Away from the keyboard</source>
+        <extracomment>Raw detector text, matched by prefix, and the family it belongs to. The idle detector writes the measured seconds into its reason — &quot;idle for 312s&quot; — so an exact match would produce one family per deferral and a statistics page nobody can read. `session lock` covers the lock detector&apos;s two words for the same fact: it defers with &quot;session locked&quot; while the screen is locked and credits the rest with &quot;session lock&quot; when it is unlocked. Both are the screen having been locked, and a reader should not be shown two names for that.</extracomment>
+        <translation>بعيد عن لوحة المفاتيح</translation>
+    </message>
+    <message>
+        <location filename="../../application/reasons.py" line="48"/>
+        <source>Screen locked</source>
+        <translation>الشاشة مقفلة</translation>
+    </message>
+    <message>
+        <location filename="../../application/reasons.py" line="49"/>
+        <source>Fullscreen or presenting</source>
+        <translation>ملء الشاشة أو عرض تقديمي</translation>
+    </message>
+    <message>
+        <location filename="../../application/reasons.py" line="50"/>
+        <source>Screensaver running</source>
+        <translation>شاشة التوقف تعمل</translation>
+    </message>
+    <message>
+        <location filename="../../application/reasons.py" line="51"/>
+        <source>Postponed</source>
+        <translation>مؤجلة</translation>
+    </message>
+</context>
+<context>
+    <name>Settings</name>
+    <message>
+        <location filename="../../application/settings.py" line="147"/>
+        <source>%1 is not a language Ocura has.</source>
+        <extracomment>Endonyms — each language&apos;s name for itself, never translated. A German speaker looking for their language looks for &quot;Deutsch&quot;, and an interface they cannot currently read is exactly the situation this menu exists to get them out of. The rhythms offered on the first-run screen, in minutes. Twenty is the guideline the product is shaped around; the longer two exist because a guideline nobody follows helps nobody, and someone who will take a break every forty-five minutes is better served than someone who turns Ocura off. See docs/EVIDENCE.md. Bounds that exist to catch a typo rather than to express a preference. A four-second focus block or a nine-hour one is a slip of the keyboard, and refusing it with a reason is kinder than accepting it and behaving oddly. How long without input before an offer is pointless. Not a schedule field: it configures a detector, not the timer. A language name, or SYSTEM_LANGUAGE to follow Windows. Not validated against the catalogues that exist on disk: a build missing a .qm still has to start, and it falls back to English rather than refusing. The evidence line at the foot of the break screen. Set once the first-run screens have been through. Persisted with the settings rather than beside them: &quot;has this person been introduced to Ocura&quot; is a fact about them, and it belongs wherever their choices are.</extracomment>
+        <translation>%1 ليست لغة متوفرة في Ocura.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="154"/>
+        <source>%1 is not a theme Ocura has. Choose one of: %2.</source>
+        <translation>%1 ليس مظهرًا متوفرًا في Ocura. اختر واحدًا من: %2.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="168"/>
+        <source>The break interval</source>
+        <translation>المدة بين الاستراحات</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="169"/>
+        <source>The break length</source>
+        <translation>طول الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="173"/>
+        <source>The warning lead time</source>
+        <translation>مدة التنبيه المسبق</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="175"/>
+        <source>The idle threshold</source>
+        <translation>حد الخمول</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="180"/>
+        <source>%1 must be a number.</source>
+        <translation>%1 يجب أن يكون رقمًا.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="184"/>
+        <source>%1 must be longer than nothing.</source>
+        <translation>%1 يجب أن يكون أطول من لا شيء.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="190"/>
+        <source>An interval of %1 would mean almost continuous interruption. The shortest Ocura will accept is %2.</source>
+        <translation>مدة %1 تعني مقاطعة شبه متواصلة. وأقصر ما يقبله Ocura هو %2.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="201"/>
+        <source>An interval of %1 is longer than Ocura will accept (%2). If you meant to stop the reminders, pause them instead.</source>
+        <translation>مدة %1 أطول مما يقبله Ocura (%2). إن كنت تريد إيقاف التنبيهات، فأوقفها مؤقتًا بدلًا من ذلك.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="212"/>
+        <source>A break of %1 is too short to rest anything. The shortest Ocura will accept is %2.</source>
+        <translation>استراحة من %1 أقصر من أن تريح شيئًا. وأقصر ما يقبله Ocura هو %2.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="223"/>
+        <source>An idle threshold of %1 is longer than Ocura will accept (%2).</source>
+        <translation>حد خمول قدره %1 أطول مما يقبله Ocura (%2).</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="242"/>
+        <source>A break of %1 does not fit inside an interval of %2. The break has to be shorter than the time between breaks.</source>
+        <translation>استراحة من %1 لا تتسع داخل مدة قدرها %2. يجب أن تكون الاستراحة أقصر من المدة بين الاستراحات.</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="253"/>
+        <source>A warning %1 ahead would start before the interval of %2 it is warning about. The lead time has to be shorter than the interval.</source>
+        <translation>تنبيه قبل %1 سيبدأ قبل المدة البالغة %2 التي ينبّه إليها. يجب أن تكون مدة التنبيه المسبق أقصر من المدة نفسها.</translation>
+    </message>
+</context>
+<context>
+    <name>SettingsPage</name>
+    <message>
+        <location filename="../settings_page.py" line="72"/>
+        <source>Dark</source>
+        <extracomment>Wide enough that Ocura&apos;s own limits are always the ones doing the refusing. If Qt clamps first the user gets a number they did not type and no reason for it, which is the one thing this page is built not to do. Source text for the theme names. Translated on every retranslate; the stored value is always the untranslated key.</extracomment>
+        <translation>داكن</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="73"/>
+        <source>Light</source>
+        <translation>فاتح</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="199"/>
+        <source>Rhythm</source>
+        <extracomment>A validated Settings the user has just asked for. Emitted only when it is honourable, so nothing downstream has to validate a second time. field, heading, explanation, control, spin-box suffix.</extracomment>
+        <translation>الإيقاع</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="203"/>
+        <source>Time between breaks</source>
+        <translation>المدة بين الاستراحات</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="204"/>
+        <source>How long a focus block runs before Ocura offers a break.</source>
+        <translation>كم تستمر فترة التركيز قبل أن يعرض Ocura استراحة.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="213"/>
+        <source>Break length</source>
+        <translation>طول الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="214"/>
+        <source>How long the break screen stays up. Twenty seconds is the guideline Ocura is built around.</source>
+        <translation>كم تبقى شاشة الاستراحة ظاهرة. العشرون ثانية هي التوصية التي بُني عليها Ocura.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="224"/>
+        <source>Warning lead time</source>
+        <translation>مدة التنبيه المسبق</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="225"/>
+        <source>How long before a break Ocura says one is coming, so you can finish your thought.</source>
+        <translation>كم قبل الاستراحة يخبرك Ocura بقدومها، حتى تُتمّ ما في ذهنك.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="236"/>
+        <source>When not to interrupt</source>
+        <translation>متى لا يقاطع</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="240"/>
+        <source>Idle threshold</source>
+        <translation>حد الخمول</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="241"/>
+        <source>How long without keyboard or mouse before Ocura decides you are away and waits rather than offering a break to an empty chair.</source>
+        <translation>كم من الوقت دون لوحة مفاتيح أو فأرة قبل أن يعتبرك Ocura غائبًا فينتظر بدل أن يعرض استراحة على كرسي فارغ.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="252"/>
+        <source>Language and appearance</source>
+        <translation>اللغة والمظهر</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="256"/>
+        <source>Language</source>
+        <translation>اللغة</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="257"/>
+        <source>Ocura follows your Windows language unless you choose one here.</source>
+        <translation>يتبع Ocura لغة Windows لديك ما لم تختر لغة هنا.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="266"/>
+        <source>Theme</source>
+        <translation>المظهر</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="267"/>
+        <source>The dark and light themes for the main window.</source>
+        <translation>المظهر الداكن والفاتح للنافذة الرئيسية.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="275"/>
+        <source>Break-screen evidence</source>
+        <translation>مصدر شاشة الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="276"/>
+        <source>The sourced line at the foot of the break screen.</source>
+        <translation>السطر الموثّق أسفل شاشة الاستراحة.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="284"/>
+        <source>Start with Windows</source>
+        <translation>البدء مع Windows</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="285"/>
+        <source>Adds Ocura to your sign-in startup list. You can also remove it from Task Manager, under Startup.</source>
+        <translation>يضيف Ocura إلى قائمة بدء التشغيل عند تسجيل الدخول. ويمكنك أيضًا إزالته من إدارة المهام، تحت بدء التشغيل.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="364"/>
+        <source>Settings</source>
+        <translation>الإعدادات</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="367"/>
+        <source>Changes apply to the session you are in now. Nothing here is saved anywhere but on this machine.</source>
+        <translation>تُطبَّق التغييرات على الجلسة الحالية. ولا يُحفظ أي شيء هنا إلا على هذا الجهاز.</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="376"/>
+        <source>Show the evidence line on the break screen</source>
+        <translation>إظهار سطر المصدر في شاشة الاستراحة</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="377"/>
+        <source>Start Ocura when I sign in to Windows</source>
+        <translation>تشغيل Ocura عند تسجيل الدخول إلى Windows</translation>
+    </message>
+    <message>
+        <location filename="../../application/settings.py" line="51"/>
+        <source>Use my Windows language</source>
+        <extracomment>The themes the settings model will accept. Named here rather than imported from `ocura.ui.theme`, which this layer is banned from reaching, and checked against the real theme table by a test so the two cannot drift apart. The languages Ocura ships. Source strings are English, so &quot;en&quot; needs no catalogue and is the fallback for anything unsupported. Languages written right to left. One entry today; a list rather than a comparison with &quot;ar&quot; so adding Hebrew is a line here and nothing else. &quot;Follow the system&quot;, stored as the empty string. A sentinel rather than a second boolean field: &quot;which language&quot; has one answer, and one of the possible answers is &quot;whichever Windows is set to&quot;. The one label on the language menu that is not a language&apos;s own name.</extracomment>
+        <translation>استخدام لغة Windows لديّ</translation>
+    </message>
+</context>
+<context>
+    <name>Statistics</name>
+    <message>
+        <location filename="../../application/statistics.py" line="223"/>
+        <source>The last seven days</source>
+        <extracomment>A week, which is the window the page reads and the one the chart draws. Long enough to show a shape, short enough that every bar is a day the user still remembers. Oldest first, always exactly the window length, today last. Commonest first. Of the tallest day in the window, so the chart is read against itself rather than against a target. There is no target. Of the commonest reason, so the row reads as a proportion of the others. Nothing has happened yet. The page says so plainly and says when there will be something, rather than drawing an empty chart with no bars in it. There is at least one day with time on it. Separate from `empty`, because a week can have breaks in it and still have no finished focus block to chart — which is exactly what a database written by someone who only ever used &quot;Take a break now&quot; looks like. Seven bars of zero height under a title is an empty chart, and an empty chart reads as a measurement of zero rather than as an absence of measurements. Said in the chart&apos;s place when there is nothing to draw in it.</extracomment>
+        <translation>الأيام السبعة الماضية</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="224"/>
+        <source>What Ocura recorded while it was running. Times are counted in focus blocks that finished.</source>
+        <translation>ما سجّله Ocura أثناء عمله. تُحسب الأوقات بفترات التركيز المكتملة.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="247"/>
+        <source>When Ocura waited</source>
+        <translation>متى انتظر Ocura</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="270"/>
+        <source>Nothing to show yet. Ocura records a focus block once it finishes, so the first one appears here after your first full block.</source>
+        <translation>لا شيء لعرضه بعد. يسجّل Ocura فترة التركيز عند اكتمالها، فتظهر الأولى هنا بعد أول فترة كاملة لك.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="275"/>
+        <source>Nothing to show yet. Ocura records a focus block once it finishes, so the first one appears here about %1 after you start a session. The week fills in a day at a time after that.</source>
+        <translation>لا شيء لعرضه بعد. يسجّل Ocura فترة التركيز عند اكتمالها، فتظهر الأولى هنا بعد نحو %1 من بدء الجلسة. ثم يمتلئ الأسبوع يومًا بعد يوم.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="285"/>
+        <source>No focus block has finished yet, so there is nothing to chart. Breaks are counted above as they happen.</source>
+        <translation>لم تكتمل أي فترة تركيز بعد، فلا شيء يُرسم. تُحسب الاستراحات أعلاه فور حدوثها.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="290"/>
+        <source>No focus block has finished yet, so there is nothing to chart. A block is about %1; breaks are counted above as they happen.</source>
+        <translation>لم تكتمل أي فترة تركيز بعد، فلا شيء يُرسم. تستغرق الفترة نحو %1؛ وتُحسب الاستراحات أعلاه فور حدوثها.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="305"/>
+        <source>Ocura holds a break back when the moment is wrong — while the screen is locked, while something is fullscreen, while you are away from the keyboard. It has not needed to yet.</source>
+        <translation>يؤجّل Ocura الاستراحة حين تكون اللحظة غير مناسبة — حين تكون الشاشة مقفلة، أو يعمل شيء بملء الشاشة، أو تكون بعيدًا عن لوحة المفاتيح. ولم يحتج إلى ذلك بعد.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="316"/>
+        <source>Ocura held a break back once this week rather than interrupting, and waited for a better moment. This is why.</source>
+        <translation>أجّل Ocura استراحة مرة واحدة هذا الأسبوع بدل أن يقاطع، وانتظر لحظة أفضل. وهذا هو السبب.</translation>
+    </message>
+    <message>
+        <location filename="../../application/statistics.py" line="321"/>
+        <source>Ocura held a break back %1 times this week rather than interrupting, and waited for a better moment. This is why.</source>
+        <translation>أجّل Ocura استراحة %1 مرة هذا الأسبوع بدل أن يقاطع، وانتظر لحظة أفضل. وهذا هو السبب.</translation>
+    </message>
+</context>
+<context>
+    <name>StatisticsPage</name>
+    <message>
+        <location filename="../statistics.py" line="254"/>
+        <source>At the screen today</source>
+        <extracomment>Tall enough for the shape of a week to be legible, short enough that the deferral list below it is on the screen at the same time in a default-sized window. That list is the reason this page exists; a chart that pushed it under the fold would have made it a footnote, which is exactly what it is not. Measured against MIN_SIZE rather than chosen by eye. A day with time on it always draws something. Without a floor, a twenty minute day next to an eight hour one rounds to nothing and reads as a day when Ocura was not running, which is a different fact. The deferral rows are a proportion of the commonest reason, drawn as a track behind the label rather than as a second chart.</extracomment>
+        <translation>أمام الشاشة اليوم</translation>
+    </message>
+    <message>
+        <location filename="../statistics.py" line="255"/>
+        <source>This week</source>
+        <translation>هذا الأسبوع</translation>
+    </message>
+    <message>
+        <location filename="../statistics.py" line="256"/>
+        <source>Breaks taken</source>
+        <translation>الاستراحات المأخوذة</translation>
+    </message>
+    <message>
+        <location filename="../statistics.py" line="257"/>
+        <source>Average focus block</source>
+        <translation>متوسط فترة التركيز</translation>
+    </message>
+    <message>
+        <location filename="../statistics.py" line="344"/>
+        <source>At the screen, by day</source>
+        <translation>أمام الشاشة، حسب اليوم</translation>
+    </message>
+</context>
+<context>
+    <name>Status</name>
+    <message>
+        <location filename="../../application/presenter.py" line="346"/>
+        <source>Not running</source>
+        <translation>لا يعمل</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="347"/>
+        <source>Start a session when you are ready.</source>
+        <translation>ابدأ جلسة عندما تكون مستعدًا.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="351"/>
+        <source>Focusing</source>
+        <translation>تركيز</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="352"/>
+        <source>Next break in %1.</source>
+        <translation>الاستراحة التالية بعد %1.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="356"/>
+        <source>Break soon</source>
+        <translation>استراحة قريبًا</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="357"/>
+        <source>In %1. Finish your thought.</source>
+        <translation>بعد %1. أتمّ ما في ذهنك.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="363"/>
+        <source>Break ready</source>
+        <translation>الاستراحة جاهزة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="364"/>
+        <source>Whenever suits you.</source>
+        <translation>متى ما ناسبك.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="368"/>
+        <source>On a break</source>
+        <translation>في استراحة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="369"/>
+        <source>%1 left. Look somewhere far away.</source>
+        <translation>بقي %1. انظر إلى مكان بعيد.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="375"/>
+        <source>Reminders paused</source>
+        <translation>أُوقفت التنبيهات مؤقتًا</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="376"/>
+        <source>Nothing is counting. Resume when you like.</source>
+        <translation>لا شيء يُحتسب. استأنف متى شئت.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="379"/>
+        <source>Waiting for a good moment</source>
+        <translation>في انتظار لحظة مناسبة</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="381"/>
+        <source>Break owed — %1.</source>
+        <translation>استراحة مستحقة — %1.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="384"/>
+        <source>Break owed.</source>
+        <translation>استراحة مستحقة.</translation>
+    </message>
+</context>
+<context>
+    <name>Tips</name>
+    <message>
+        <location filename="../../application/presenter.py" line="63"/>
+        <source>Every 20 minutes, look at something 20 feet away for 20 seconds — American Academy of Ophthalmology</source>
+        <extracomment>How often a view should pulse the presenter. Advisory: every duration is read from the monotonic clock, so a late or missed pulse costs refresh latency and never corrupts a measurement. This session only, cleared on restart. P4 makes history persistent. Translation contexts are written as literals at every call site, never as constants. lupdate reads the source rather than running it, so `translate(STATUS, &quot;Focusing&quot;)` extracts nothing at all — which is exactly how this was first written, and the catalogue came out with the whole application layer missing. The contexts here are &quot;Status&quot;, &quot;Events&quot;, &quot;Tips&quot; and &quot;Tray&quot;: one per surface, because a translator seeing &quot;Status&quot; knows where the sentence appears, which is the only thing a context is for. Mirrors the domain guard on take_break_now, so the view never offers a control the timer would refuse. The line at the foot of the break screen. One per break, rotated so the same sentence is not read twice in a row. Each states the evidence the break rests on and stops there. It is not a second instruction: the screen already says what to do, and a smaller voice repeating it in the corner is nagging. The attribution is part of the text rather than decoration — a claim about someone&apos;s eyes that cannot be traced back to anyone is not worth putting on the screen at all. Marked, not translated. A constant translated at import is fixed to the language Python happened to be started in, which is the bug that makes a language switch look like it half-worked.</extracomment>
+        <translation>كل 20 دقيقة، انظر 20 ثانية إلى شيء يبعد نحو 6 أمتار — الأكاديمية الأمريكية لطب العيون</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="68"/>
+        <source>Close work holds the lens under tension; looking into the distance is what lets it relax — American Optometric Association</source>
+        <translation>العمل القريب يُبقي العدسة مشدودة، والنظر إلى البعيد هو ما يُرخيها — الجمعية الأمريكية للبصريات</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="73"/>
+        <source>Blink rate falls by about half at a screen, which is what leaves eyes dry — American Optometric Association</source>
+        <translation>يقل معدل الرمش إلى النصف تقريبًا أمام الشاشة، وهذا ما يجفف العينين — الجمعية الأمريكية للبصريات</translation>
+    </message>
+</context>
+<context>
+    <name>Tray</name>
+    <message>
+        <location filename="../../application/presenter.py" line="321"/>
+        <source>Ocura — on a break, %1 left</source>
+        <translation>Ocura — في استراحة، بقي %1</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="325"/>
+        <source>Ocura — waiting, %1</source>
+        <translation>Ocura — في الانتظار، %1</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="327"/>
+        <source>Ocura — break in %1</source>
+        <translation>Ocura — استراحة بعد %1</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="329"/>
+        <source>Ocura — reminders paused</source>
+        <translation>Ocura — التنبيهات موقوفة مؤقتًا</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="331"/>
+        <source>Ocura — not running</source>
+        <translation>Ocura — لا يعمل</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="332"/>
+        <source>Ocura — next break in %1</source>
+        <translation>Ocura — الاستراحة التالية بعد %1</translation>
+    </message>
+    <message>
+        <location filename="../tray.py" line="28"/>
+        <source>Open Ocura</source>
+        <translation>فتح Ocura</translation>
+    </message>
+    <message>
+        <location filename="../tray.py" line="29"/>
+        <source>Take a break now</source>
+        <translation>خذ استراحة الآن</translation>
+    </message>
+    <message>
+        <location filename="../tray.py" line="30"/>
+        <source>Quit</source>
+        <translation>إنهاء</translation>
+    </message>
+    <message>
+        <location filename="../tray.py" line="32"/>
+        <location filename="../tray.py" line="90"/>
+        <source>Resume reminders</source>
+        <translation>استئناف التنبيهات</translation>
+    </message>
+    <message>
+        <location filename="../tray.py" line="32"/>
+        <location filename="../tray.py" line="90"/>
+        <source>Pause reminders</source>
+        <translation>إيقاف التنبيهات مؤقتًا</translation>
+    </message>
+</context>
+<context>
+    <name>Units</name>
+    <message>
+        <location filename="../../application/i18n.py" line="112"/>
+        <source>%1s</source>
+        <extracomment>Units, abbreviated. Ocura never writes &quot;20 minutes&quot; in a sentence it has to translate, because plural forms do not survive the trip: lupdate cannot tell which argument of a plain Python call is the count, so it marks nothing as `numerus`, and Arabic has six plural forms that would then have nowhere to live. An abbreviation has one form in all three languages, and every sentence that needs a duration takes it through a `%1` placeholder instead.</extracomment>
+        <translation>%1 ث</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="116"/>
+        <source>%1m</source>
+        <translation>%1 د</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="120"/>
+        <source>%1h</source>
+        <translation>%1 س</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="121"/>
+        <source>%1h %2m</source>
+        <translation>%1 س %2 د</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="152"/>
+        <source>1 hour</source>
+        <translation>ساعة واحدة</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="153"/>
+        <source>%1 hours</source>
+        <translation>%1 ساعة</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="158"/>
+        <source>1 minute</source>
+        <translation>دقيقة واحدة</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="159"/>
+        <source>%1 minutes</source>
+        <translation>%1 دقيقة</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="164"/>
+        <source>1 second</source>
+        <translation>ثانية واحدة</translation>
+    </message>
+    <message>
+        <location filename="../../application/i18n.py" line="165"/>
+        <source>%1 seconds</source>
+        <translation>%1 ثانية</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="209"/>
+        <source> min</source>
+        <translation> د</translation>
+    </message>
+    <message>
+        <location filename="../settings_page.py" line="220"/>
+        <location filename="../settings_page.py" line="231"/>
+        <location filename="../settings_page.py" line="247"/>
+        <source> sec</source>
+        <translation> ث</translation>
+    </message>
+</context>
+</TS>

@@ -25,6 +25,11 @@ datas = [
     # it in the bundle exactly as it does in the source tree.
     (str(SRC / "ocura" / "ui" / "style.qss"), "ocura/ui"),
     (str(SRC / "ocura" / "ui" / "assets"), "ocura/ui/assets"),
+    # The compiled catalogues. A build without them does not fail: it runs in
+    # English and says nothing, on a machine whose owner chose Arabic. That is
+    # why --self-check reports each one and the release verify greps its
+    # output for MISSING.
+    (str(SRC / "ocura" / "ui" / "i18n"), "ocura/ui/i18n"),
 ]
 
 analysis = Analysis(
