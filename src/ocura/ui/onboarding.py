@@ -12,7 +12,7 @@ decided and tested.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -37,6 +37,11 @@ DIALOG_HEIGHT = 480
 #: where every other number already lives and the refusals are already handled.
 CUSTOM_LABEL = "Something else — I will set it in Settings"
 
+#: The rhythm buttons. A whole sentence per button rather than a number with
+#: "Every" glued to the front: German puts the unit differently and Arabic
+#: reads the other way, and neither can be fixed from a fragment.
+RHYTHM_LABEL = "Every %1 minutes"
+
 
 class OnboardingDialog(QDialog):
     """Three screens. Ends in a Settings, or in nothing at all if dismissed."""
@@ -48,7 +53,7 @@ class OnboardingDialog(QDialog):
         super().__init__(parent)
         self._flow = flow or Onboarding()
 
-        self.setWindowTitle("Welcome to Ocura")
+        self.setWindowTitle(self.tr("Welcome to Ocura"))
         self.setObjectName("Onboarding")
         self.setModal(True)
         self.resize(DIALOG_WIDTH, DIALOG_HEIGHT)
@@ -63,19 +68,19 @@ class OnboardingDialog(QDialog):
         self._choice_layout.setContentsMargins(0, 0, 0, 0)
         self._choice_layout.setSpacing(SPACING.s)
         self._rhythms = QButtonGroup(self)
-        self._autostart_yes = QRadioButton("Yes, start Ocura when I sign in")
-        self._autostart_no = QRadioButton("No, I will start it myself")
+        self._autostart_yes = QRadioButton()
+        self._autostart_no = QRadioButton()
         for button in (self._autostart_yes, self._autostart_no):
             button.setObjectName("OnboardingChoice")
 
-        self._back = QPushButton("Back")
-        self._advance = QPushButton("Next")
+        self._back = QPushButton()
+        self._advance = QPushButton()
         self._advance.setObjectName("Primary")
         self._advance.setDefault(True)
 
         self._build()
         self._connect()
-        self.render(self._flow.view())
+        self.retranslate()
 
     # No fade between screens. Fading the dialog itself means compositing a
     # top-level window against nothing, which paints the platform's default
@@ -120,8 +125,28 @@ class OnboardingDialog(QDialog):
 
     # --- rendering ---------------------------------------------------------
 
+    def retranslate(self) -> None:
+        """This dialog's own chrome. The three screens are the flow's language.
+
+        Re-rendering afterwards is what puts the new language on the screen
+        text itself: `Onboarding.view()` translates at render, so asking for
+        the view again is the whole update.
+        """
+        self.setWindowTitle(self.tr("Welcome to Ocura"))
+        self._back.setText(self.tr("Back"))
+        self._autostart_yes.setText(self.tr("Yes, start Ocura when I sign in"))
+        self._autostart_no.setText(self.tr("No, I will start it myself"))
+        self.render(self._flow.view())
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate()
+        super().changeEvent(event)
+
     def render(self, view: OnboardingView) -> None:
-        self._position.setText(f"{view.position} of {view.total}")
+        self._position.setText(
+            self.tr("%1 of %2").replace("%1", str(view.position)).replace("%2", str(view.total))
+        )
         self._title.setText(view.title)
         self._body.setText(view.body)
         self._note.setText(view.note)
@@ -148,15 +173,15 @@ class OnboardingDialog(QDialog):
 
     def _build_rhythms(self, view: OnboardingView) -> None:
         for index, minutes in enumerate(view.rhythm_choices):
-            button = QRadioButton(f"Every {minutes} minutes")
+            button = QRadioButton(self.tr(RHYTHM_LABEL).replace("%1", str(minutes)))
             button.setObjectName("OnboardingChoice")
             button.setChecked(minutes == view.chosen_minutes)
             self._rhythms.addButton(button, minutes)
             self._choice_layout.addWidget(button)
             if index == 0:
-                button.setToolTip("The 20-20-20 guideline")
+                button.setToolTip(self.tr("The 20-20-20 guideline"))
 
-        custom = QRadioButton(CUSTOM_LABEL)
+        custom = QRadioButton(self.tr(CUSTOM_LABEL))
         custom.setObjectName("OnboardingChoice")
         custom.setChecked(view.chosen_minutes not in view.rhythm_choices)
         # Id 0, which no rhythm can have: choosing it changes nothing now and

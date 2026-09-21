@@ -18,7 +18,7 @@ change, exactly as P6 needs.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtWidgets import (
     QFrame,
@@ -226,6 +226,7 @@ class StatisticsPage(QWidget):
         self._reasons_holder.setSpacing(SPACING.sm)
 
         self._build()
+        self.retranslate()
         # Rendered once on construction so the page is correct before anyone
         # navigates to it. Without this it exists for a moment showing default
         # label text, which a screenshot or a test would catch as real content.
@@ -247,6 +248,7 @@ class StatisticsPage(QWidget):
         metrics_layout = QHBoxLayout(self._metrics)
         metrics_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
         metrics_layout.setSpacing(SPACING.xl)
+        self._captions: list[tuple[object, str]] = []
         for widget, caption in (
             (self._today, "At the screen today"),
             (self._week, "This week"),
@@ -256,14 +258,17 @@ class StatisticsPage(QWidget):
             column = QVBoxLayout()
             column.setSpacing(SPACING.xs)
             column.addWidget(widget)
-            column.addWidget(_label(caption, "MetricLabel"))
+            label = _label("", "MetricLabel")
+            self._captions.append((label, caption))
+            column.addWidget(label)
             metrics_layout.addLayout(column)
         metrics_layout.addStretch(1)
 
         chart_layout = QVBoxLayout(self._chart_card)
         chart_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
         chart_layout.setSpacing(SPACING.sm)
-        chart_layout.addWidget(_label("At the screen, by day", "SectionTitle"))
+        self._chart_title = _label("", "SectionTitle")
+        chart_layout.addWidget(self._chart_title)
         chart_layout.addWidget(self._chart, 1)
 
         # The deferral card is the reason this page exists: it is the one that
@@ -311,6 +316,23 @@ class StatisticsPage(QWidget):
         root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
         root.addWidget(scroller, 1)
         root.addStretch(0)
+
+    def retranslate(self) -> None:
+        """The page's own labels. Everything else arrives already translated.
+
+        The headline, the notes and the deferral reasons are the presenter's,
+        computed fresh on every `refresh`, so a language change reaches them
+        through the query rather than through here.
+        """
+        for label, caption in self._captions:
+            label.setText(self.tr(caption))
+        self._chart_title.setText(self.tr("At the screen, by day"))
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate()
+            self.refresh()
+        super().changeEvent(event)
 
     def refresh(self) -> None:
         """Re-read the window and render it. Called when the page is opened."""

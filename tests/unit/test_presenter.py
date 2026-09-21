@@ -291,9 +291,12 @@ def test_break_due_is_not_shown_as_an_event(
     [(0, "0:00"), (5, "0:05"), (65, "1:05"), (600, "10:00"), (3600, "1:00:00"), (-5, "0:00")],
 )
 def test_clock_text(seconds: float, expected: str):
-    from ocura.application.presenter import _clock_text
+    from ocura.application.i18n import clock_text
 
-    assert _clock_text(seconds) == expected
+    # Moved to i18n with the rest of the formatting, and deliberately not
+    # localised: a countdown read from the corner of the eye stays in Western
+    # digits in every language.
+    assert clock_text(seconds) == expected
 
 
 def test_tooltip_tracks_the_state(

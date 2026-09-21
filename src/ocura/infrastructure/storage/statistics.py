@@ -29,6 +29,7 @@ import sqlite3
 from collections import Counter
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
+from ocura.application.i18n import QT_TRANSLATE_NOOP
 from ocura.application.session import SessionEventKind
 from ocura.application.statistics import (
     WINDOW_DAYS,
@@ -48,11 +49,15 @@ _BREAK_HAPPENED = (SessionEventKind.BREAK_COMPLETED, SessionEventKind.BREAK_SKIP
 #: on the raw string would produce one bucket per deferral and a list nobody
 #: can read. Matched by prefix and kept in one place so a detector's wording
 #: and this page's wording cannot drift apart silently.
+#: The family names are marked, not translated: they are grouped, counted and
+#: sorted as source text, and turned into the reader's language only when the
+#: page renders them. Translating here would sort the list by whatever the
+#: language happened to be and group two spellings of the same family apart.
 _REASON_FAMILIES: tuple[tuple[str, str], ...] = (
-    ("idle for", "Away from the keyboard"),
-    ("session locked", "Screen locked"),
-    ("fullscreen or presenting", "Fullscreen or presenting"),
-    ("screensaver running", "Screensaver running"),
+    ("idle for", QT_TRANSLATE_NOOP("Reasons", "Away from the keyboard")),
+    ("session locked", QT_TRANSLATE_NOOP("Reasons", "Screen locked")),
+    ("fullscreen or presenting", QT_TRANSLATE_NOOP("Reasons", "Fullscreen or presenting")),
+    ("screensaver running", QT_TRANSLATE_NOOP("Reasons", "Screensaver running")),
 )
 
 

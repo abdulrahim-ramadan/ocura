@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
+from ocura.application.i18n import QT_TRANSLATE_NOOP, clock_text, translate
 from ocura.application.journal import NullJournal, SessionJournal
 from ocura.application.session import BreakSession, SessionEvent, SessionEventKind
 from ocura.application.settings import DEFAULTS, Settings
@@ -34,6 +35,14 @@ TICK_SECONDS = 1.0
 #: This session only, cleared on restart. P4 makes history persistent.
 MAX_EVENTS = 100
 
+#: Translation contexts. One per surface rather than one per module: a
+#: translator sees "Dashboard" and knows where the sentence appears, which is
+#: the only thing a context is for.
+STATUS = "Status"
+EVENTS = "Events"
+TIPS = "Tips"
+TRAY = "Tray"
+
 #: Mirrors the domain guard on take_break_now, so the view never offers a
 #: control the timer would refuse.
 _USER_MAY_ASK = frozenset({TimerState.FOCUSING, TimerState.BREAK_DUE, TimerState.DEFERRED})
@@ -46,13 +55,25 @@ _USER_MAY_ASK = frozenset({TimerState.FOCUSING, TimerState.BREAK_DUE, TimerState
 #: repeating it in the corner is nagging. The attribution is part of the text
 #: rather than decoration — a claim about someone's eyes that cannot be traced
 #: back to anyone is not worth putting on the screen at all.
+#: Marked, not translated. A constant translated at import is fixed to the
+#: language Python happened to be started in, which is the bug that makes a
+#: language switch look like it half-worked.
 BREAK_TIPS = (
-    "Every 20 minutes, look at something 20 feet away for 20 seconds "
-    "— American Academy of Ophthalmology",
-    "Close work holds the lens under tension; looking into the distance is what "
-    "lets it relax — American Optometric Association",
-    "Blink rate falls by about half at a screen, which is what leaves eyes dry "
-    "— American Optometric Association",
+    QT_TRANSLATE_NOOP(
+        TIPS,
+        "Every 20 minutes, look at something 20 feet away for 20 seconds "
+        "— American Academy of Ophthalmology",
+    ),
+    QT_TRANSLATE_NOOP(
+        TIPS,
+        "Close work holds the lens under tension; looking into the distance is what "
+        "lets it relax — American Optometric Association",
+    ),
+    QT_TRANSLATE_NOOP(
+        TIPS,
+        "Blink rate falls by about half at a screen, which is what leaves eyes dry "
+        "— American Optometric Association",
+    ),
 )
 
 
@@ -125,15 +146,6 @@ class SessionView:
     #: display. Stable for the whole of one break, since it is keyed to the
     #: count of breaks finished and that does not move while one is running.
     tip: str = ""
-
-
-def _clock_text(seconds: float) -> str:
-    seconds = max(0, int(seconds))
-    hours, rest = divmod(seconds, 3600)
-    minutes, secs = divmod(rest, 60)
-    if hours:
-        return f"{hours}:{minutes:02d}:{secs:02d}"
-    return f"{minutes}:{secs:02d}"
 
 
 class BreakPresenter:
@@ -246,11 +258,11 @@ class BreakPresenter:
         if state is TimerState.ON_BREAK:
             span = self._schedule.break_duration
             progress = 1.0 - (snapshot.break_remaining / span) if span else 0.0
-            countdown = _clock_text(snapshot.break_remaining)
+            countdown = clock_text(snapshot.break_remaining)
         else:
             span = self._schedule.focus_interval
             progress = min(1.0, snapshot.focus_elapsed / span) if span else 0.0
-            countdown = _clock_text(snapshot.focus_remaining)
+            countdown = clock_text(snapshot.focus_remaining)
 
         return SessionView(
             state=state,
@@ -262,7 +274,7 @@ class BreakPresenter:
             focus_elapsed=snapshot.focus_elapsed,
             focus_remaining=snapshot.focus_remaining,
             break_remaining=snapshot.break_remaining,
-            focus_elapsed_text=_clock_text(snapshot.focus_elapsed),
+            focus_elapsed_text=clock_text(snapshot.focus_elapsed),
             countdown_text=countdown,
             progress=max(0.0, min(1.0, progress)),
             waiting_reason=self._waiting_reason if snapshot.break_owed else None,
@@ -284,37 +296,68 @@ class BreakPresenter:
         """One line for the tray, which has room for nothing more."""
         view = self.view()
         if view.state is TimerState.ON_BREAK:
-            return f"Ocura — on a break, {view.countdown_text} left"
+            return translate(TRAY, "Ocura — on a break, %1 left").replace("%1", view.countdown_text)
         if view.waiting_reason:
-            return f"Ocura — waiting, {view.waiting_reason}"
+            return translate(TRAY, "Ocura — waiting, %1").replace("%1", view.waiting_reason)
         if view.state is TimerState.PRE_BREAK:
-            return f"Ocura — break in {view.countdown_text}"
+            return translate(TRAY, "Ocura — break in %1").replace("%1", view.countdown_text)
         if view.state is TimerState.PAUSED:
-            return "Ocura — reminders paused"
+            return translate(TRAY, "Ocura — reminders paused")
         if view.state is TimerState.IDLE:
-            return "Ocura — not running"
-        return f"Ocura — next break in {view.countdown_text}"
+            return translate(TRAY, "Ocura — not running")
+        return translate(TRAY, "Ocura — next break in %1").replace("%1", view.countdown_text)
 
     # --- internals ---------------------------------------------------------
 
     def _describe(self, state: TimerState, break_left: float, focus_left: float) -> tuple[str, str]:
+        """Every sentence takes its numbers through a placeholder.
+
+        A translator needs to move "in 5:00" to the other end of the sentence
+        in German and to the other end of the line in Arabic, and cannot do
+        either if the number is glued on here.
+        """
         match state:
             case TimerState.IDLE:
-                return "Not running", "Start a session when you are ready."
+                return (
+                    translate(STATUS, "Not running"),
+                    translate(STATUS, "Start a session when you are ready."),
+                )
             case TimerState.FOCUSING:
-                return "Focusing", f"Next break in {_clock_text(focus_left)}."
+                return (
+                    translate(STATUS, "Focusing"),
+                    translate(STATUS, "Next break in %1.").replace("%1", clock_text(focus_left)),
+                )
             case TimerState.PRE_BREAK:
-                return "Break soon", f"In {_clock_text(focus_left)}. Finish your thought."
+                return (
+                    translate(STATUS, "Break soon"),
+                    translate(STATUS, "In %1. Finish your thought.").replace(
+                        "%1", clock_text(focus_left)
+                    ),
+                )
             case TimerState.BREAK_DUE:
-                return "Break ready", "Whenever suits you."
+                return (
+                    translate(STATUS, "Break ready"),
+                    translate(STATUS, "Whenever suits you."),
+                )
             case TimerState.ON_BREAK:
-                return "On a break", f"{_clock_text(break_left)} left. Look somewhere far away."
+                return (
+                    translate(STATUS, "On a break"),
+                    translate(STATUS, "%1 left. Look somewhere far away.").replace(
+                        "%1", clock_text(break_left)
+                    ),
+                )
             case TimerState.PAUSED:
-                return "Reminders paused", "Nothing is counting. Resume when you like."
+                return (
+                    translate(STATUS, "Reminders paused"),
+                    translate(STATUS, "Nothing is counting. Resume when you like."),
+                )
             case TimerState.DEFERRED:
+                headline = translate(STATUS, "Waiting for a good moment")
                 if self._waiting_reason:
-                    return "Waiting for a good moment", f"Break owed — {self._waiting_reason}."
-                return "Waiting for a good moment", "Break owed."
+                    return headline, translate(STATUS, "Break owed — %1.").replace(
+                        "%1", self._waiting_reason
+                    )
+                return headline, translate(STATUS, "Break owed.")
 
     def _keep(self, event: SessionEvent) -> None:
         """Persistence is best-effort. The break engine is not.
@@ -372,26 +415,30 @@ class BreakPresenter:
         # the list read as though something happened when nothing did.
         match event.kind:
             case SessionEventKind.STARTED:
-                return "Session started"
+                return translate(EVENTS, "Session started")
             case SessionEventKind.BREAK_STARTED | SessionEventKind.BREAK_STARTED_BY_USER:
-                return "Break started"
+                return translate(EVENTS, "Break started")
             case SessionEventKind.BREAK_COMPLETED | SessionEventKind.BREAK_SKIPPED:
                 # Deliberately the same sentence for both. Ocura does not force
                 # breaks, and a list that announced a shorter one differently
                 # would be commenting on a choice it has no business having an
                 # opinion about.
-                return "Break finished"
+                return translate(EVENTS, "Break finished")
             case SessionEventKind.BREAK_DEFERRED:
-                return f"Waiting — {event.detail}" if event.detail else "Waiting for a good moment"
+                if event.detail:
+                    return translate(EVENTS, "Waiting — %1").replace("%1", event.detail)
+                return translate(EVENTS, "Waiting for a good moment")
             case SessionEventKind.BREAK_SNOOZED:
-                return "Break postponed"
+                return translate(EVENTS, "Break postponed")
             case SessionEventKind.BREAK_SATISFIED:
-                return f"Rest credited — {event.detail}" if event.detail else "Rest credited"
+                if event.detail:
+                    return translate(EVENTS, "Rest credited — %1").replace("%1", event.detail)
+                return translate(EVENTS, "Rest credited")
             case SessionEventKind.PAUSED:
-                return "Reminders paused"
+                return translate(EVENTS, "Reminders paused")
             case SessionEventKind.RESUMED:
-                return "Reminders resumed"
+                return translate(EVENTS, "Reminders resumed")
             case SessionEventKind.STOPPED:
-                return "Session stopped"
+                return translate(EVENTS, "Session stopped")
             case _:
                 return None

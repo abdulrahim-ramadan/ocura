@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QPoint, QRect, QSettings, QSize, Qt, Signal
+from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, QSettings, QSize, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QGuiApplication, QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -21,6 +21,10 @@ from ocura.ui.settings_page import SettingsPage
 from ocura.ui.statistics import StatisticsPage
 from ocura.ui.theme import LAYOUT, SPACING
 from ocura.ui.views import DashboardView
+
+#: The sidebar sections, in order. Source text; translated on every
+#: retranslate so a language change relabels them in place.
+NAV_SECTIONS = ("Dashboard", "Statistics", "Settings")
 
 DEFAULT_SIZE = QSize(880, 660)
 
@@ -54,7 +58,7 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self._settings = settings
 
-        self.setWindowTitle("Ocura")
+        self._theme_is_dark = True
         self.setWindowIcon(icon)
         self.setMinimumSize(MIN_SIZE)
 
@@ -75,6 +79,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._pages, 1)
         self.setCentralWidget(root)
 
+        self.retranslate()
         self._restore_geometry()
 
     def _sidebar(self) -> QWidget:
@@ -88,12 +93,13 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, SPACING.sm)
         layout.setSpacing(SPACING.xs)
         layout.addWidget(_label("Ocura", "Wordmark"))
-        layout.addWidget(_label("Better screen habits.", "Tagline"))
+        self._tagline = _label("", "Tagline")
+        layout.addWidget(self._tagline)
 
         self._nav = QButtonGroup(self)
         self._nav.setExclusive(True)
-        for index, name in enumerate(("Dashboard", "Statistics", "Settings")):
-            button = QPushButton(name)
+        for index, _name in enumerate(NAV_SECTIONS):
+            button = QPushButton()
             button.setObjectName("NavButton")
             button.setCheckable(True)
             button.setChecked(index == 0)
@@ -113,8 +119,27 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._theme_button)
         return bar
 
+    def retranslate(self) -> None:
+        self.setWindowTitle(self.tr("Ocura"))
+        self._tagline.setText(self.tr("Better screen habits."))
+        for index, name in enumerate(NAV_SECTIONS):
+            button = self._nav.button(index)
+            if button is not None:
+                button.setText(self.tr(name))
+        self._theme_button.setText(
+            self.tr("Light theme") if self._theme_is_dark else self.tr("Dark theme")
+        )
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate()
+        super().changeEvent(event)
+
     def set_theme_name(self, name: str) -> None:
-        self._theme_button.setText("Light theme" if name == "dark" else "Dark theme")
+        self._theme_is_dark = name == "dark"
+        self._theme_button.setText(
+            self.tr("Light theme") if self._theme_is_dark else self.tr("Dark theme")
+        )
         # The footer button is a shortcut to the real setting, which is what
         # docs/architecture.md said it would become once there was one. The
         # page stays the single place that decides what a theme change means.

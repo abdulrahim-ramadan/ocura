@@ -26,7 +26,11 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Protocol, runtime_checkable
 
+from ocura.application.i18n import duration_text, duration_words, translate
 from ocura.domain.schedule import BreakSchedule
+
+STATISTICS = "Statistics"
+REASONS = "Reasons"
 
 #: A week, which is the window the page reads and the one the chart draws. Long
 #: enough to show a shape, short enough that every bar is a day the user still
@@ -129,22 +133,6 @@ def empty_window(today: date, days: int = WINDOW_DAYS) -> Statistics:
 # --- the words -------------------------------------------------------------
 
 
-def duration_text(seconds: float | None) -> str:
-    """Hours and minutes, never seconds.
-
-    Seconds on this page would be false precision: every number here is a total
-    over a day or a week, and nobody makes a decision on the strength of forty
-    seconds of screen time.
-    """
-    if seconds is None or seconds <= 0:
-        return "—"
-    minutes = int(seconds / 60 + 0.5)
-    if minutes < 60:
-        return f"{minutes}m"
-    hours, rest = divmod(minutes, 60)
-    return f"{hours}h" if rest == 0 else f"{hours}h {rest}m"
-
-
 @dataclass(frozen=True, slots=True)
 class DayBar:
     """One column of the week chart, already in the words it should say."""
@@ -218,10 +206,11 @@ class StatisticsPresenter:
         today = statistics.today.day
 
         return StatisticsPageView(
-            headline="The last seven days",
-            subheading=(
+            headline=translate(STATISTICS, "The last seven days"),
+            subheading=translate(
+                STATISTICS,
                 "What Ocura recorded while it was running. "
-                "Times are counted in focus blocks that finished."
+                "Times are counted in focus blocks that finished.",
             ),
             empty=statistics.is_empty,
             empty_message=self._empty_message(),
@@ -241,11 +230,14 @@ class StatisticsPresenter:
                 )
                 for day in statistics.days
             ),
-            deferrals_title="When Ocura waited",
+            deferrals_title=translate(STATISTICS, "When Ocura waited"),
             deferrals_note=self._deferrals_note(statistics),
             deferrals=tuple(
                 DeferralLine(
-                    reason=entry.reason,
+                    # A reason this build has never heard of passes through
+                    # untranslated, which is the same bargain the storage layer
+                    # makes when it keeps an unknown family verbatim.
+                    reason=translate(REASONS, entry.reason),
                     count_text=f"{entry.count}",
                     fraction=(entry.count / busiest) if busiest else 0.0,
                 )
@@ -261,29 +253,31 @@ class StatisticsPresenter:
         the page is waiting for and roughly how long that takes.
         """
         if self._schedule is None:
-            return (
+            return translate(
+                STATISTICS,
                 "Nothing to show yet. Ocura records a focus block once it finishes, "
-                "so the first one appears here after your first full block."
+                "so the first one appears here after your first full block.",
             )
-        minutes = int(self._schedule.focus_interval / 60 + 0.5)
-        return (
+        return translate(
+            STATISTICS,
             "Nothing to show yet. Ocura records a focus block once it finishes, so the "
-            f"first one appears here about {minutes} minutes after you start a session. "
-            "The week fills in a day at a time after that."
-        )
+            "first one appears here about %1 after you start a session. The week fills "
+            "in a day at a time after that.",
+        ).replace("%1", duration_words(self._schedule.focus_interval))
 
     def _chart_note(self) -> str:
         """Why the chart is not there, in the place it would have been."""
         if self._schedule is None:
-            return (
+            return translate(
+                STATISTICS,
                 "No focus block has finished yet, so there is nothing to chart. "
-                "Breaks are counted above as they happen."
+                "Breaks are counted above as they happen.",
             )
-        minutes = int(self._schedule.focus_interval / 60 + 0.5)
-        return (
+        return translate(
+            STATISTICS,
             "No focus block has finished yet, so there is nothing to chart. A block is "
-            f"about {minutes} minutes; breaks are counted above as they happen."
-        )
+            "about %1; breaks are counted above as they happen.",
+        ).replace("%1", duration_words(self._schedule.focus_interval))
 
     def _deferrals_note(self, statistics: Statistics) -> str:
         """The most useful sentence on the page, so it is the one that explains.
@@ -294,14 +288,24 @@ class StatisticsPresenter:
         not as something the user did.
         """
         if not statistics.deferrals:
-            return (
+            return translate(
+                STATISTICS,
                 "Ocura holds a break back when the moment is wrong — while the screen is "
                 "locked, while something is fullscreen, while you are away from the keyboard. "
-                "It has not needed to yet."
+                "It has not needed to yet.",
             )
         total = sum(entry.count for entry in statistics.deferrals)
-        times = "once" if total == 1 else f"{total} times"
-        return (
-            f"Ocura held a break back {times} this week rather than interrupting, "
-            "and waited for a better moment. This is why."
-        )
+        # Two whole sentences rather than one with a count spliced into it.
+        # "once" and "4 times" are not interchangeable fragments in German or
+        # Arabic, and a translator handed a fragment cannot fix that.
+        if total == 1:
+            return translate(
+                STATISTICS,
+                "Ocura held a break back once this week rather than interrupting, and "
+                "waited for a better moment. This is why.",
+            )
+        return translate(
+            STATISTICS,
+            "Ocura held a break back %1 times this week rather than interrupting, and "
+            "waited for a better moment. This is why.",
+        ).replace("%1", str(total))

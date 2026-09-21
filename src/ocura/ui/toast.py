@@ -19,7 +19,7 @@ focus would mean taking focus.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QScreen
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
@@ -64,11 +64,11 @@ class BreakToast(QWidget):
 
         self._headline = QLabel("")
         self._headline.setObjectName("ToastHeadline")
-        self._detail = QLabel("Look at something far away when it arrives.")
+        self._detail = QLabel()
         self._detail.setObjectName("ToastDetail")
         self._detail.setWordWrap(True)
 
-        self._snooze = QPushButton("Not now")
+        self._snooze = QPushButton()
         self._snooze.setObjectName("ToastAction")
         self._snooze.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._snooze.clicked.connect(self.snoozeRequested)
@@ -84,6 +84,16 @@ class BreakToast(QWidget):
         layout.addWidget(self._headline)
         layout.addWidget(self._detail)
         layout.addLayout(buttons)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        self._detail.setText(self.tr("Look at something far away when it arrives."))
+        self._snooze.setText(self.tr("Not now"))
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate()
+        super().changeEvent(event)
 
     def render(self, headline: str, can_snooze: bool) -> None:
         self._headline.setText(headline)

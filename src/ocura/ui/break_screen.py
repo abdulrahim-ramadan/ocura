@@ -23,7 +23,7 @@ between elements that belong to each other.
 
 from __future__ import annotations
 
-from PySide6.QtCore import Property, QPointF, QSize, Qt, Signal
+from PySide6.QtCore import Property, QEvent, QPointF, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPalette, QRadialGradient
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -208,7 +208,7 @@ class BreakScreen(QWidget):
         self.shape = FocusShape()
         self.blink = BlinkCue()
 
-        self._message = QLabel("Look at something far away")
+        self._message = QLabel()
         self._message.setObjectName("BreakMessage")
         self._message.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -226,11 +226,11 @@ class BreakScreen(QWidget):
 
         # Skip says what it does and nothing about what it means. Ending a break
         # early is a legitimate choice and the screen has no opinion about it.
-        self._skip = QPushButton("Skip")
+        self._skip = QPushButton()
         self._skip.setObjectName("BreakAction")
         self._skip.clicked.connect(self.skipRequested)
 
-        self._snooze = QPushButton("Later")
+        self._snooze = QPushButton()
         self._snooze.setObjectName("BreakAction")
         self._snooze.clicked.connect(self.snoozeRequested)
 
@@ -263,6 +263,8 @@ class BreakScreen(QWidget):
         layout.addStretch(EDGE_BOTTOM_STRETCH)
         layout.addWidget(self._tip)
 
+        self.retranslate()
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         # Sized against the screen, not against the leftover room in the
@@ -276,6 +278,25 @@ class BreakScreen(QWidget):
         self.blink.set_openness(1.0)
         MOTION.recede(self.shape, seconds, SHAPE_MIN_SCALE)
         MOTION.blink(self.blink, seconds)
+
+    def retranslate(self) -> None:
+        """The three strings this screen owns.
+
+        The instruction is the only sentence on the break screen, so it is the
+        one that most has to be in the reader's language: somebody who cannot
+        read it is being asked to stare at a dim rectangle for twenty seconds
+        for no stated reason.
+        """
+        self._message.setText(self.tr("Look at something far away"))
+        # Says what it does and nothing about what it means. Ending a break
+        # early is a legitimate choice and the screen has no opinion about it.
+        self._skip.setText(self.tr("Skip"))
+        self._snooze.setText(self.tr("Later"))
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate()
+        super().changeEvent(event)
 
     def render(self, view: SessionView) -> None:
         self._countdown.setText(view.countdown_text)

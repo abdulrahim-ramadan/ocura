@@ -25,13 +25,50 @@ import math
 from dataclasses import dataclass, replace
 from typing import Protocol, runtime_checkable
 
+from ocura.application.i18n import duration_words, translate
 from ocura.domain.errors import ConfigurationError
 from ocura.domain.schedule import DEFAULT_SCHEDULE, BreakSchedule
+
+SETTINGS = "Settings"
 
 #: The themes the settings model will accept. Named here rather than imported
 #: from `ocura.ui.theme`, which this layer is banned from reaching, and checked
 #: against the real theme table by a test so the two cannot drift apart.
 THEME_NAMES = ("dark", "light")
+
+#: The languages Ocura ships. Source strings are English, so "en" needs no
+#: catalogue and is the fallback for anything unsupported.
+LANGUAGE_NAMES = ("en", "de", "ar")
+
+#: Languages written right to left. One entry today; a list rather than a
+#: comparison with "ar" so adding Hebrew is a line here and nothing else.
+RTL_LANGUAGES = frozenset({"ar"})
+
+#: "Follow the system", stored as the empty string. A sentinel rather than a
+#: second boolean field: "which language" has one answer, and one of the
+#: possible answers is "whichever Windows is set to".
+SYSTEM_LANGUAGE = ""
+
+#: The one label on the language menu that is not a language's own name.
+SYSTEM_LABEL = "Use my Windows language"
+
+#: Endonyms — each language's name for itself, never translated. A German
+#: speaker looking for their language looks for "Deutsch", and an interface
+#: they cannot currently read is exactly the situation this menu exists to get
+#: them out of.
+LANGUAGE_LABELS = {"en": "English", "de": "Deutsch", "ar": "العربية"}
+
+
+def language_label(name: str, system_label: str) -> str:
+    """The menu entry for a language, or for following the system."""
+    if name == SYSTEM_LANGUAGE:
+        return system_label
+    return LANGUAGE_LABELS.get(name, name)
+
+
+def is_rtl(language: str) -> bool:
+    return language in RTL_LANGUAGES
+
 
 #: The rhythms offered on the first-run screen, in minutes. Twenty is the
 #: guideline the product is shaped around; the longer two exist because a
@@ -66,19 +103,6 @@ class InvalidSettings(ConfigurationError):
         self.field = field
 
 
-def _minutes(seconds: float) -> str:
-    """For error messages, where "1200 seconds" is not what the user typed.
-
-    Rounded to one decimal, because the alternative is a sentence containing
-    "11.6667 minutes" — which is arithmetic showing its working, not an
-    explanation of what went wrong.
-    """
-    if seconds < 60:
-        return f"{round(seconds, 1):g} seconds"
-    value = round(seconds / 60, 1)
-    return f"{value:g} minute" if value == 1 else f"{value:g} minutes"
-
-
 @dataclass(frozen=True, slots=True)
 class Settings:
     """Everything the user can change. Seconds throughout, like the domain.
@@ -96,6 +120,10 @@ class Settings:
     idle_threshold: float = 120.0
     autostart: bool = False
     theme: str = "dark"
+    #: A language name, or SYSTEM_LANGUAGE to follow Windows. Not validated
+    #: against the catalogues that exist on disk: a build missing a .qm still
+    #: has to start, and it falls back to English rather than refusing.
+    language: str = SYSTEM_LANGUAGE
     #: The evidence line at the foot of the break screen.
     tips: bool = True
     #: Set once the first-run screens have been through. Persisted with the
@@ -116,10 +144,18 @@ class Settings:
         """
         self._check_numbers()
         self._check_combinations()
+        if self.language not in (SYSTEM_LANGUAGE, *LANGUAGE_NAMES):
+            raise InvalidSettings(
+                translate(SETTINGS, "%1 is not a language Ocura has.").replace(
+                    "%1", repr(self.language)
+                ),
+                "language",
+            )
         if self.theme not in THEME_NAMES:
             raise InvalidSettings(
-                f"{self.theme!r} is not a theme Ocura has. "
-                f"Choose one of: {', '.join(THEME_NAMES)}.",
+                translate(SETTINGS, "%1 is not a theme Ocura has. Choose one of: %2.")
+                .replace("%1", repr(self.theme))
+                .replace("%2", ", ".join(THEME_NAMES)),
                 "theme",
             )
         # The backstop. Everything above names a condition in the user's own
@@ -131,42 +167,66 @@ class Settings:
 
     def _check_numbers(self) -> None:
         fields = (
-            ("focus_interval", self.focus_interval, "The break interval"),
-            ("break_duration", self.break_duration, "The break length"),
-            ("pre_break_warning", self.pre_break_warning, "The warning lead time"),
-            ("idle_threshold", self.idle_threshold, "The idle threshold"),
+            ("focus_interval", self.focus_interval, translate(SETTINGS, "The break interval")),
+            ("break_duration", self.break_duration, translate(SETTINGS, "The break length")),
+            (
+                "pre_break_warning",
+                self.pre_break_warning,
+                translate(SETTINGS, "The warning lead time"),
+            ),
+            ("idle_threshold", self.idle_threshold, translate(SETTINGS, "The idle threshold")),
         )
         for field, value, name in fields:
             if not isinstance(value, int | float) or isinstance(value, bool):
-                raise InvalidSettings(f"{name} must be a number.", field)
+                raise InvalidSettings(
+                    translate(SETTINGS, "%1 must be a number.").replace("%1", name), field
+                )
             if not math.isfinite(value) or value <= 0:
-                raise InvalidSettings(f"{name} must be longer than nothing.", field)
+                raise InvalidSettings(
+                    translate(SETTINGS, "%1 must be longer than nothing.").replace("%1", name),
+                    field,
+                )
 
         if self.focus_interval < MIN_FOCUS_SECONDS:
             raise InvalidSettings(
-                f"An interval of {_minutes(self.focus_interval)} would mean almost "
-                "continuous interruption. The shortest Ocura will accept is "
-                f"{_minutes(MIN_FOCUS_SECONDS)}.",
+                translate(
+                    SETTINGS,
+                    "An interval of %1 would mean almost continuous interruption. "
+                    "The shortest Ocura will accept is %2.",
+                )
+                .replace("%1", duration_words(self.focus_interval))
+                .replace("%2", duration_words(MIN_FOCUS_SECONDS)),
                 "focus_interval",
             )
         if self.focus_interval > MAX_FOCUS_SECONDS:
             raise InvalidSettings(
-                f"An interval of {_minutes(self.focus_interval)} is longer than Ocura "
-                f"will accept ({_minutes(MAX_FOCUS_SECONDS)}). If you meant to stop "
-                "the reminders, pause them instead.",
+                translate(
+                    SETTINGS,
+                    "An interval of %1 is longer than Ocura will accept (%2). "
+                    "If you meant to stop the reminders, pause them instead.",
+                )
+                .replace("%1", duration_words(self.focus_interval))
+                .replace("%2", duration_words(MAX_FOCUS_SECONDS)),
                 "focus_interval",
             )
         if self.break_duration < MIN_BREAK_SECONDS:
             raise InvalidSettings(
-                f"A break of {_minutes(self.break_duration)} is too short to rest "
-                f"anything. The shortest Ocura will accept is "
-                f"{_minutes(MIN_BREAK_SECONDS)}.",
+                translate(
+                    SETTINGS,
+                    "A break of %1 is too short to rest anything. "
+                    "The shortest Ocura will accept is %2.",
+                )
+                .replace("%1", duration_words(self.break_duration))
+                .replace("%2", duration_words(MIN_BREAK_SECONDS)),
                 "break_duration",
             )
         if self.idle_threshold > MAX_IDLE_SECONDS:
             raise InvalidSettings(
-                f"An idle threshold of {_minutes(self.idle_threshold)} is longer than "
-                f"Ocura will accept ({_minutes(MAX_IDLE_SECONDS)}).",
+                translate(
+                    SETTINGS, "An idle threshold of %1 is longer than Ocura will accept (%2)."
+                )
+                .replace("%1", duration_words(self.idle_threshold))
+                .replace("%2", duration_words(MAX_IDLE_SECONDS)),
                 "idle_threshold",
             )
 
@@ -181,16 +241,24 @@ class Settings:
         """
         if self.break_duration >= self.focus_interval:
             raise InvalidSettings(
-                f"A break of {_minutes(self.break_duration)} does not fit inside an "
-                f"interval of {_minutes(self.focus_interval)}. The break has to be "
-                "shorter than the time between breaks.",
+                translate(
+                    SETTINGS,
+                    "A break of %1 does not fit inside an interval of %2. "
+                    "The break has to be shorter than the time between breaks.",
+                )
+                .replace("%1", duration_words(self.break_duration))
+                .replace("%2", duration_words(self.focus_interval)),
                 "break_duration",
             )
         if self.pre_break_warning >= self.focus_interval:
             raise InvalidSettings(
-                f"A warning {_minutes(self.pre_break_warning)} ahead would start before "
-                f"the interval of {_minutes(self.focus_interval)} it is warning about. "
-                "The lead time has to be shorter than the interval.",
+                translate(
+                    SETTINGS,
+                    "A warning %1 ahead would start before the interval of %2 it is "
+                    "warning about. The lead time has to be shorter than the interval.",
+                )
+                .replace("%1", duration_words(self.pre_break_warning))
+                .replace("%2", duration_words(self.focus_interval)),
                 "pre_break_warning",
             )
 

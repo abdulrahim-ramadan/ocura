@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -54,10 +54,10 @@ class DashboardView(QWidget):
         self._waiting = _label("", "WaitingNote")
         self._waiting.hide()
 
-        self._start = QPushButton("Start session")
+        self._start = QPushButton()
         self._start.setObjectName("Primary")
-        self._pause = QPushButton("Pause reminders")
-        self._break = QPushButton("Take a break now")
+        self._pause = QPushButton()
+        self._break = QPushButton()
 
         self._start.clicked.connect(self.startRequested)
         self._pause.clicked.connect(self.pauseToggled)
@@ -73,6 +73,8 @@ class DashboardView(QWidget):
         self._events.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._events.setMinimumHeight(SPACING.xl)
         self._last_headline = ""
+        self._running = False
+        self._paused = False
 
         self._build()
 
@@ -100,6 +102,7 @@ class DashboardView(QWidget):
         metrics_layout = QHBoxLayout(metrics)
         metrics_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
         metrics_layout.setSpacing(SPACING.xl)
+        self._captions: list[tuple[QLabel, str]] = []
         for widget, caption in (
             (self._breaks_taken, "Breaks taken"),
             (self._rests_credited, "Rests credited"),
@@ -108,7 +111,9 @@ class DashboardView(QWidget):
             column = QVBoxLayout()
             column.setSpacing(SPACING.xs)
             column.addWidget(widget)
-            column.addWidget(_label(caption, "MetricLabel"))
+            label = _label("", "MetricLabel")
+            self._captions.append((label, caption))
+            column.addWidget(label)
             metrics_layout.addLayout(column)
         metrics_layout.addStretch(1)
 
@@ -126,7 +131,8 @@ class DashboardView(QWidget):
         events_layout = QVBoxLayout(events)
         events_layout.setContentsMargins(SPACING.lg, SPACING.m, SPACING.lg, SPACING.m)
         events_layout.setSpacing(SPACING.sm)
-        events_layout.addWidget(_label("This session", "SectionTitle"))
+        self._events_title = _label("", "SectionTitle")
+        events_layout.addWidget(self._events_title)
         events_layout.addWidget(self._events)
 
         content = QWidget()
@@ -169,6 +175,35 @@ class DashboardView(QWidget):
         root.setContentsMargins(SPACING.lg, SPACING.lg, SPACING.lg, SPACING.lg)
         root.addWidget(scroller, 1)
         root.addStretch(0)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        """Re-set every string this widget owns, in the language now active.
+
+        Qt posts a LanguageChange event to every widget when a translator is
+        installed, and `changeEvent` turns that into this call. Text that came
+        from a SessionView is not touched here — the presenter recomputes it on
+        the next tick, and it is not this widget's to decide.
+        """
+        for label, caption in self._captions:
+            label.setText(self.tr(caption))
+        self._events_title.setText(self.tr("This session"))
+        self._break.setText(self.tr("Take a break now"))
+        self._retranslate_buttons()
+
+    def _retranslate_buttons(self) -> None:
+        """The two buttons whose label depends on state as well as language."""
+        self._start.setText(
+            self.tr("Restart session") if self._running else self.tr("Start session")
+        )
+        self._pause.setText(
+            self.tr("Resume reminders") if self._paused else self.tr("Pause reminders")
+        )
+
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.Type.LanguageChange:
+            self.retranslate()
+        super().changeEvent(event)
 
     def render(self, view: SessionView) -> None:
         # Fade on a real state change only. Doing it every tick would be a
@@ -183,13 +218,13 @@ class DashboardView(QWidget):
         MOTION.fill(self._progress, int(view.progress * 1000))
 
         if view.waiting_reason:
-            self._waiting.setText(f"Waiting — {view.waiting_reason}")
+            self._waiting.setText(self.tr("Waiting — %1").replace("%1", view.waiting_reason))
             self._waiting.show()
         else:
             self._waiting.hide()
 
-        self._start.setText("Start session" if not view.running else "Restart session")
-        self._pause.setText("Resume reminders" if view.paused else "Pause reminders")
+        self._running, self._paused = view.running, view.paused
+        self._retranslate_buttons()
         self._pause.setEnabled(view.running)
         self._break.setEnabled(view.can_take_break_now)
 

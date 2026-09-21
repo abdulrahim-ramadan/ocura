@@ -176,11 +176,29 @@ def test_an_unknown_theme_is_refused_and_the_real_ones_are_listed():
 
 
 def test_a_message_does_not_show_its_arithmetic():
-    """ "11.6667 minutes" is a calculation showing its working, not a sentence."""
+    """ "11.6667 minutes" is a calculation showing its working, not a sentence.
+
+    A duration that is not a whole number of minutes is said in seconds rather
+    than rounded into them.
+    """
     with pytest.raises(InvalidSettings) as raised:
         Settings(focus_interval=600.0, pre_break_warning=700.0).validate()
 
-    assert "11.7 minutes" in str(raised.value)
+    message = str(raised.value)
+    assert "700 seconds" in message
+    assert "11.6" not in message
+
+
+def test_a_message_never_rounds_two_values_into_the_same_words():
+    """610 seconds and 600 rounded to minutes both read "10 minutes", and the
+    refusal becomes "a warning 10 minutes ahead would start before the interval
+    of 10 minutes" — a contradiction that explains nothing."""
+    with pytest.raises(InvalidSettings) as raised:
+        Settings(focus_interval=600.0, pre_break_warning=610.0).validate()
+
+    message = str(raised.value)
+    assert "610 seconds" in message
+    assert message.count("10 minutes") == 1
 
 
 # --- the derived schedule fields -------------------------------------------

@@ -17,16 +17,33 @@ class Tray(QObject):
     breakRequested = Signal()
     quitRequested = Signal()
 
+    def retranslate(self) -> None:
+        """The tray menu, in the language now active.
+
+        A QObject rather than a QWidget, so no LanguageChange event arrives
+        here — the application calls this directly when the language changes.
+        A tray menu left in the old language is the most visible thing to miss,
+        because it is the one part of Ocura that is always reachable.
+        """
+        self._open.setText(self.tr("Open Ocura"))
+        self._break.setText(self.tr("Take a break now"))
+        self._quit.setText(self.tr("Quit"))
+        self._pause.setText(
+            self.tr("Resume reminders") if self._paused else self.tr("Pause reminders")
+        )
+
     def __init__(self, icon: QIcon, parent: QObject | None = None) -> None:
         super().__init__(parent)
 
         self._icon = QSystemTrayIcon(icon, self)
         self._menu = QMenu()
 
-        self._open = QAction("Open Ocura", self)
-        self._pause = QAction("Pause reminders", self)
-        self._break = QAction("Take a break now", self)
-        self._quit = QAction("Quit", self)
+        self._open = QAction(self)
+        self._pause = QAction(self)
+        self._break = QAction(self)
+        self._quit = QAction(self)
+        self._paused = False
+        self.retranslate()
 
         self._open.triggered.connect(self.openRequested)
         self._pause.triggered.connect(self.pauseToggled)
@@ -68,7 +85,10 @@ class Tray(QObject):
 
     def render(self, view: SessionView, tooltip: str) -> None:
         self._icon.setToolTip(tooltip)
-        self._pause.setText("Resume reminders" if view.paused else "Pause reminders")
+        self._paused = view.paused
+        self._pause.setText(
+            self.tr("Resume reminders") if view.paused else self.tr("Pause reminders")
+        )
         self._pause.setEnabled(view.running)
         self._break.setEnabled(view.can_take_break_now)
 
