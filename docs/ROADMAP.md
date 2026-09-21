@@ -208,6 +208,14 @@ literals handed to Qt's own text setters, and the defects that actually
 survived the first pass went in by other routes. They are listed in
 [architecture.md](architecture.md#what-the-translation-pass-found).
 
+**Arabic means the whole interface turns round**, not a font change. Qt
+mirrors layouts, alignment and text direction from one property on the
+application; what it does not mirror is a stylesheet, a paint event, or
+`text-align` — which it mirrors *twice* if you help it. The three exceptions
+and the break overlay's rule, that the text block mirrors while the focus
+shape stays centred, are in
+[architecture.md](architecture.md#arabic-turns-the-interface-round).
+
 German is the longest of the three and clipped three surfaces; each is fixed
 structurally rather than by padding a number, and the list is in
 [architecture.md](architecture.md#german-is-longer-and-it-clipped-three-things).

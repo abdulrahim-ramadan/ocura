@@ -200,6 +200,29 @@ THEMES = {theme.name: theme for theme in (DARK, LIGHT)}
 DEFAULT_THEME = DARK.name
 
 
-def stylesheet(tokens: Tokens) -> str:
+#: The two directional placeholders in the stylesheet, resolved per language.
+#:
+#: **Qt does not mirror a stylesheet.** It mirrors layouts, alignment and the
+#: direction text flows in, but `border-left` in QSS means the left border in
+#: Arabic exactly as it does in English — so the accent that marks the current
+#: section was drawn down the far edge of a right-hand sidebar, pointing away
+#: from the words it belongs to. Every directional rule is written in terms of
+#: the *reading* edges instead, and the stylesheet is rebuilt when the language
+#: changes.
+def _edges(rtl: bool) -> dict[str, str]:
+    """`edge_start` is the edge reading begins at; `edge_end` is the other."""
+    return {
+        "edge_start": "right" if rtl else "left",
+        "edge_end": "left" if rtl else "right",
+    }
+
+
+def stylesheet(tokens: Tokens, rtl: bool = False) -> str:
+    """The one stylesheet, in one theme, for one reading direction.
+
+    `rtl` defaults to False so that every caller who has no opinion — every
+    test that asks about colour, and the self-check — gets what they always
+    got. The application is the one caller that has an opinion.
+    """
     template = (resources.files(QSS_PACKAGE) / QSS_NAME).read_text(encoding="utf-8")
-    return template.format(**asdict(tokens))
+    return template.format(**asdict(tokens), **_edges(rtl))

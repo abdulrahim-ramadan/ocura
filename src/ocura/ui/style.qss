@@ -20,9 +20,11 @@ QLabel {{
 
 /* --- navigation ------------------------------------------------------- */
 
+/* The separator faces the content, so it is on the sidebar's trailing edge:
+   the right of a left-hand sidebar, the left of a right-hand one. */
 #Sidebar {{
     background: {surface};
-    border-right: 1px solid {border};
+    border-{edge_end}: 1px solid {border};
 }}
 
 #Wordmark {{
@@ -43,11 +45,15 @@ QLabel {{
 #NavButton {{
     background: transparent;
     border: none;
-    border-left: 2px solid transparent;
+    border-{edge_start}: 2px solid transparent;
     border-radius: {radius_s};
     color: {text_muted};
     font-size: {font_size_m};
     padding: {space_s} {space_sm};
+    /* The one directional property here that is NOT written in reading edges.
+       Qt mirrors text-align itself: under a right-to-left layout this "left"
+       is drawn on the right, and writing "right" flips it back to the left —
+       measured, after the whole sidebar came out reading the wrong way. */
     text-align: left;
 }}
 
@@ -58,7 +64,7 @@ QLabel {{
 
 #NavButton:checked {{
     background: {nav_selected};
-    border-left: 2px solid {accent};
+    border-{edge_start}: 2px solid {accent};
     color: {text};
 }}
 
@@ -107,7 +113,7 @@ QLabel {{
 #WaitingNote {{
     background: {accent_quiet};
     border: none;
-    border-left: 2px solid {accent};
+    border-{edge_start}: 2px solid {accent};
     border-radius: {radius_s};
     color: {text_muted};
     font-size: {font_size_m};
@@ -189,7 +195,7 @@ QLabel {{
 #SettingProblem {{
     background: {accent_quiet};
     border: none;
-    border-left: 2px solid {accent};
+    border-{edge_start}: 2px solid {accent};
     border-radius: {radius_s};
     color: {text};
     font-size: {font_size_s};

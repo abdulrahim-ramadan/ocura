@@ -135,6 +135,56 @@ def test_selection_is_marked_quietly(tokens: Tokens):
     assert f"border-left: 2px solid {tokens.accent}" in checked
 
 
+# --- reading direction ----------------------------------------------------
+#
+# Qt mirrors layouts, alignment and the direction text flows in. It does not
+# mirror a stylesheet: `border-left` is the left border in Arabic exactly as
+# it is in English. So every directional rule is written in terms of the edge
+# reading starts at, and resolved when the sheet is built.
+
+
+def rule(qss: str, selector: str) -> str:
+    return qss.split(selector)[1].split("}")[0]
+
+
+@pytest.mark.parametrize("tokens", [DARK, LIGHT], ids=lambda t: t.name)
+def test_the_accent_marks_the_edge_the_language_is_read_from(tokens: Tokens):
+    left_to_right = rule(stylesheet(tokens), "#NavButton:checked")
+    right_to_left = rule(stylesheet(tokens, rtl=True), "#NavButton:checked")
+
+    assert f"border-left: 2px solid {tokens.accent}" in left_to_right
+    assert f"border-right: 2px solid {tokens.accent}" in right_to_left
+
+
+def test_the_sidebar_separator_faces_the_content_in_both_directions():
+    """It divides the sidebar from the page, so it is on the inward edge —
+    which is the right of a left-hand sidebar and the left of a right-hand
+    one."""
+    assert "border-right: 1px solid" in rule(stylesheet(DARK), "#Sidebar")
+    assert "border-left: 1px solid" in rule(stylesheet(DARK, rtl=True), "#Sidebar")
+
+
+def test_no_rule_hard_codes_a_side():
+    """The mechanical half, like the colour rule above it.
+
+    One exception, and it is measured rather than assumed: `text-align` is
+    mirrored by Qt itself, so writing it in reading edges flips it twice and
+    the sidebar comes out aligned the wrong way.
+    """
+    from importlib import resources
+
+    from ocura.ui.theme import QSS_NAME, QSS_PACKAGE
+
+    template = (resources.files(QSS_PACKAGE) / QSS_NAME).read_text(encoding="utf-8")
+    offenders = [
+        line.strip()
+        for line in template.splitlines()
+        if re.search(r"(border|margin|padding)-(left|right)\s*:", line)
+    ]
+
+    assert offenders == []
+
+
 # --- the break overlay ----------------------------------------------------
 #
 # The overlay's colours are a ladder, not a palette: what matters is the order

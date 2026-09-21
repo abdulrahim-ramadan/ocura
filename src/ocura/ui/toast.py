@@ -45,6 +45,13 @@ def toast_position(screen: QScreen, size: tuple[int, int]) -> QPoint:
 
     availableGeometry here, unlike the overlay — this one is a notification and
     must sit where notifications sit, not on top of the shell.
+
+    **The corner does not follow Ocura's language.** Which side the tray is on
+    is a fact about the Windows installation, not about the language somebody
+    chose in Settings: an Arabic Ocura on an English Windows belongs beside
+    that desktop's notification area like everything else on it. The toast's
+    own contents mirror with the rest of the interface; where the window goes
+    does not.
     """
     area = screen.availableGeometry()
     width, height = size

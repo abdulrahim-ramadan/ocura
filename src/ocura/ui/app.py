@@ -18,6 +18,7 @@ from ocura.application.settings import (
     MemorySettings,
     Settings,
     SettingsRepository,
+    is_rtl,
     migrate_from_shell,
 )
 from ocura.application.statistics import (
@@ -285,6 +286,10 @@ class OcuraApp:
         self.language.apply(language)
         self.tray.retranslate()
         self.window.statistics.refresh()
+        # Qt mirrors layouts for a right-to-left language; it does not mirror
+        # a stylesheet, where `border-left` means the left border in every
+        # language. So the stylesheet is rebuilt for the new direction.
+        self._apply_style()
 
     def _save_preferences(self, preferences: Settings) -> None:
         try:
@@ -313,8 +318,19 @@ class OcuraApp:
         if name == self._theme_name:
             return
         self._theme_name = name
-        self._app.setStyleSheet(stylesheet(THEMES[name]))
+        self._apply_style()
         self.window.set_theme_name(name)
+
+    def _apply_style(self) -> None:
+        """One stylesheet, built for the theme and the reading direction.
+
+        Both are inputs to the same string, so both go through here — there is
+        no second place a stylesheet is set, which is what the theme test
+        checks for.
+        """
+        self._app.setStyleSheet(
+            stylesheet(THEMES[self._theme_name], rtl=is_rtl(self.language.current))
+        )
 
     # --- lifecycle ----------------------------------------------------------
 

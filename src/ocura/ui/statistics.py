@@ -112,7 +112,12 @@ class Bar(QWidget):
         painter.setBrush(colour)
         if self._horizontal:
             width = max(MIN_BAR_PIXELS, round(self.width() * self._fraction))
-            painter.drawRoundedRect(0, 0, width, self.height(), 3, 3)
+            # From the edge the row is read from. A proportion that grows away
+            # from its own label is not a proportion the eye can compare, and
+            # Qt does not mirror what a paint event draws — only what a layout
+            # places.
+            left = self.width() - width if self.isRightToLeft() else 0
+            painter.drawRoundedRect(left, 0, width, self.height(), 3, 3)
         else:
             height = max(MIN_BAR_PIXELS, round(self.height() * self._fraction))
             painter.drawRoundedRect(0, self.height() - height, self.width(), height, 3, 3)

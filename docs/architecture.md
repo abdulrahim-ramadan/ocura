@@ -1165,6 +1165,50 @@ prose and wrong for a timer. Everything else — the spin boxes, a day of the
 month — follows whatever `QLocale` the machine is set to, because that is a
 decision the user already made about their own computer.
 
+### Arabic turns the interface round
+
+`QApplication.setLayoutDirection(RightToLeft)` does most of it, and it is set
+on the application rather than per widget: Qt mirrors layouts, alignment and
+the direction text flows in from that one property, and a widget that sets its
+own is a widget that stops following the language. The sidebar moves to the
+right, the metric columns reverse, the week chart reads Monday-on-the-right,
+and the dialogs' Back and Next swap sides, all without a line of code.
+
+Three things it does **not** do, each found by looking at Arabic on a screen:
+
+- **A stylesheet is not mirrored.** `border-left` is the left border in Arabic
+  exactly as in English, so the accent marking the current section was drawn
+  down the outer edge of a right-hand sidebar, pointing away from the word it
+  belongs to. Directional rules are written as `border-{edge_start}` and
+  resolved by `stylesheet(tokens, rtl=...)`, which the application rebuilds on
+  a language change. A test refuses any hand-written `left`/`right` in the
+  template.
+- **`text-align` is the exception to that**, and only measurement settles it:
+  Qt mirrors this one itself, so writing `text-align: right` for Arabic flips
+  it twice and the sidebar comes out aligned the wrong way. It stays `left`,
+  with a comment saying why.
+- **A paint event is not mirrored.** The deferral bars are painted, not laid
+  out, so they went on growing from the left, away from the labels they are a
+  proportion of. `Bar` asks `isRightToLeft()` and starts from the other edge.
+
+### The break overlay mirrors its text and not its shape
+
+The two rules pull opposite ways on this one screen, so they are written down
+rather than left to whoever edits it next. The focus shape is a circle on the
+screen's own axis with no reading direction; mirroring it would move it off
+centre for nothing. The controls are a row that is read, so they turn round —
+the postponement sits on the leading side in both languages. `test_rtl.py`
+asserts exactly that: same centre, reversed controls.
+
+### The toast follows the shell, not the language
+
+`toast_position` puts the pre-break warning at the bottom **right** of the work
+area whatever language Ocura is in, because it is a notification and belongs
+where notifications are, beside the tray. The tray's side is a fact about the
+Windows installation, not about Ocura's language setting — an Arabic Ocura on
+an English Windows has its notification area on the right like everything else
+on that desktop. What does mirror is the toast's own contents.
+
 ### German is longer, and it clipped three things
 
 Checked by rendering, at the default window size and at the minimum, in all

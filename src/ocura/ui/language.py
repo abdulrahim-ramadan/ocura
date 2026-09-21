@@ -8,7 +8,9 @@ which cannot import Qt — reads from exactly the same file.
 **The switch is live, and that is not a claim made lightly.** Installing a
 translator makes Qt post `LanguageChange` to every widget, and every widget
 here answers it by re-setting the strings it owns; everything else is computed
-per render by a presenter, so the next tick carries it.
+per render by a presenter, so the next tick carries it. What Qt does *not*
+re-do by itself is layout direction, which is why `apply_language` sets that
+too and the window is asked to re-lay itself afterwards.
 """
 
 from __future__ import annotations
@@ -16,11 +18,15 @@ from __future__ import annotations
 import logging
 from importlib import resources
 
-from PySide6.QtCore import QLibraryInfo, QLocale, QTranslator
+from PySide6.QtCore import QLibraryInfo, QLocale, Qt, QTranslator
 from PySide6.QtWidgets import QApplication
 
 from ocura.application import i18n
-from ocura.application.settings import LANGUAGE_NAMES, SYSTEM_LANGUAGE
+from ocura.application.settings import (
+    LANGUAGE_NAMES,
+    SYSTEM_LANGUAGE,
+    is_rtl,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +117,7 @@ class Language:
 
         i18n.install(QtTranslator(self._ours))
         self.current = resolved
+        self._apply_direction(resolved)
         return resolved
 
     # --- internals ---------------------------------------------------------
@@ -163,6 +170,19 @@ class Language:
             return translator
         logger.debug("no Qt catalogue for %s in %s", language, path)
         return None
+
+    def _apply_direction(self, language: str) -> None:
+        """Mirror the whole interface for a right-to-left language.
+
+        Set on the application rather than per widget: Qt mirrors layouts,
+        alignment and the direction text flows from this one property, and a
+        widget that sets its own is a widget that stops following the language.
+        """
+        direction = (
+            Qt.LayoutDirection.RightToLeft if is_rtl(language) else Qt.LayoutDirection.LeftToRight
+        )
+        if self._app.layoutDirection() != direction:
+            self._app.setLayoutDirection(direction)
 
 
 def install_language(app: QApplication, language: str) -> Language:
