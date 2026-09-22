@@ -16,9 +16,64 @@
 # DLLs stay as separate, replaceable files in _internal/ for that reason, not
 # for convenience.
 
+import re
 from pathlib import Path
 
 SRC = Path("src").resolve()
+BUILD = Path("build").resolve()
+
+# The version, read from the one file that holds it rather than repeated here.
+# The spec is not imported as a module, so it reads the literal out of the
+# source instead of importing the package — a spec that imported ocura would
+# make packaging depend on the package being importable in the build
+# environment, which is the thing being tested.
+VERSION = re.search(
+    r'__version__ = "([^"]+)"', (SRC / "ocura" / "__init__.py").read_text(encoding="utf-8")
+).group(1)
+
+#: Windows wants four numbers. Ocura has three, and the fourth is the build
+#: field, which nothing here uses — a release is identified by its tag.
+FILE_VERSION = tuple(int(part) for part in VERSION.split(".")) + (0,)
+
+#: The properties Explorer shows on right-click → Details, and the ones an IT
+#: department reads before allowing an unsigned executable onto a machine. An
+#: executable with none of this looks like something that was thrown together,
+#: which for an unsigned build is the opposite of the impression to give.
+VERSION_RESOURCE = f"""VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={FILE_VERSION},
+    prodvers={FILE_VERSION},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0),
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        "040904B0",
+        [
+          StringStruct("CompanyName", "Abdulrahim Ramadan"),
+          StringStruct("FileDescription", "Ocura - calm break reminders for Windows"),
+          StringStruct("FileVersion", "{VERSION}"),
+          StringStruct("InternalName", "Ocura"),
+          StringStruct("LegalCopyright", "Copyright (c) 2026 Abdulrahim Ramadan"),
+          StringStruct("OriginalFilename", "Ocura.exe"),
+          StringStruct("ProductName", "Ocura"),
+          StringStruct("ProductVersion", "{VERSION}"),
+        ],
+      )
+    ]),
+    VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+  ],
+)
+"""
+
+BUILD.mkdir(parents=True, exist_ok=True)
+VERSION_FILE = BUILD / "version_info.txt"
+VERSION_FILE.write_text(VERSION_RESOURCE, encoding="utf-8")
 
 datas = [
     # Package data, kept at the same import path so importlib.resources finds
@@ -60,6 +115,7 @@ exe = EXE(
     # `Ocura.exe --self-check > out.txt`, which works without one.
     console=False,
     icon=str(SRC / "ocura" / "ui" / "assets" / "ocura.ico"),
+    version=str(VERSION_FILE),
 )
 
 COLLECT(

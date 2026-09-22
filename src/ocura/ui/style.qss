@@ -202,6 +202,14 @@ QLabel {{
     padding: {space_s} {space_m};
 }}
 
+/* The version line. The quietest text on the page: it is there to be quoted
+   in a bug report, not to be read every time Settings is opened. */
+#Version {{
+    color: {text_faint};
+    font-size: {font_size_s};
+    padding: {space_s} 0 0 0;
+}}
+
 #SettingSpin, #SettingChoice {{
     background: {surface_raised};
     border: 1px solid {border};

@@ -39,6 +39,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ocura import __version__
 from ocura.application.autostart import (
     NO_STARTUP_LIST,
     Autostart,
@@ -65,6 +66,13 @@ logger = logging.getLogger(__name__)
 #: If Qt clamps first the user gets a number they did not type and no reason
 #: for it, which is the one thing this page is built not to do.
 SPIN_CEILING = 100_000
+
+#: The product's name, which is not language: it is the same word in all three
+#: catalogues and a translated brand is a different product. Written as a
+#: constant so that the version line below assembles from two values and no
+#: sentence, which is what keeps it out of `test_no_bare_strings.py` honestly
+#: rather than by exemption.
+WORDMARK = "Ocura"
 
 #: Source text for the theme names. Translated on every retranslate; the
 #: stored value is always the untranslated key.
@@ -314,6 +322,14 @@ class SettingsPage(QWidget):
         for card in cards:
             column.addWidget(card)
         column.addStretch(1)
+        # The version, at the foot of the page a person is already in when
+        # something is wrong. A name and a number, so there is nothing here to
+        # translate and nothing to keep in step with a catalogue. It is the
+        # same string the executable's file properties and the installer
+        # carry, because all three read `ocura.__version__`.
+        self._version = _label(f"{WORDMARK} {__version__}", "Version")
+        self._version.setWordWrap(False)
+        column.addWidget(self._version)
 
         scroller = QScrollArea()
         scroller.setObjectName("Page")
