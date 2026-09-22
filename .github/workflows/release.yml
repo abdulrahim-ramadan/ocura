@@ -1,0 +1,159 @@
+name: Release
+
+# A tag is the only trigger. Pushing `vX.Y.Z` is the whole release procedure:
+# everything below runs unattended and either produces a GitHub Release with a
+# signed-off installer attached, or fails on a named step that says which part
+# of the release was wrong.
+#
+# The order is deliberate — the cheap checks that fail often come before the
+# expensive ones that fail rarely. A tag that disagrees with the source is
+# caught in two seconds, before a five-minute PyInstaller build, because the
+# only way to withdraw a wrong release is to delete it after people have seen
+# it.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# The job creates a Release and uploads to it. Nothing else here needs a token,
+# and the default read-only permission is not enough for that one step.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the tagged commit and its history
+        uses: actions/checkout@v4
+        with:
+          # The changelog is generated from the commits since the previous tag,
+          # so the default shallow clone — which has neither the history nor
+          # the tags — would silently produce an empty one.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ocura and its build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,build]"
+
+      - name: Check the tag agrees with the version in the source
+        id: version
+        # The one mistake the pipeline cannot take back. Everything else fails
+        # privately; a release published under a version the executable does
+        # not carry is public, and the file properties will disagree with the
+        # download page for as long as anyone has the file.
+        #
+        # src/ocura/__init__.py is the single source of truth — see that file.
+        run: |
+          $source = Select-String -Path src/ocura/__init__.py -Pattern '__version__ = "([^"]+)"'
+          if (-not $source) { throw "no __version__ in src/ocura/__init__.py" }
+          $version = $source.Matches[0].Groups[1].Value
+          $tag = "${{ github.ref_name }}"
+          Write-Host "tag        $tag"
+          Write-Host "__version__ $version"
+          if ($tag -ne "v$version") {
+            throw "the tag $tag does not match __version__ $version. Bump src/ocura/__init__.py, or retag as v$version."
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Format
+        run: ruff format --check .
+
+      - name: Test
+        # The full suite, as its own step rather than folded into the build, so
+        # a failure here is legible as "the tests failed" on the summary page
+        # instead of as a non-zero exit from a packaging script.
+        run: |
+          pytest --tb=short 2>&1 | Tee-Object -FilePath pytest.log
+          exit $LASTEXITCODE
+
+      # Log downloads need admin rights even on a public repository, so surface
+      # failures as check annotations, which the API serves to anyone.
+      - name: Annotate test failures
+        if: failure()
+        run: |
+          if (Test-Path pytest.log) {
+            Get-Content pytest.log |
+              Select-String -Pattern '^(FAILED|ERROR)' |
+              ForEach-Object { "::error::$($_.Line)" }
+          }
+
+      - name: Build the executable
+        # --skip-checks because ruff and pytest are the three steps above. The
+        # flag's warning is about handing over a build whose checks never ran;
+        # here they ran, and ran where a reader of the log can see which one
+        # failed. This is the only place that is true.
+        run: python scripts/build_release.py --skip-checks
+
+      - name: Locate Inno Setup
+        id: iscc
+        # The runner image ships Inno Setup 6, but "ships it today" is not a
+        # contract, and a release that fails because a runner image changed
+        # should say so rather than fail on a missing-file error from a path.
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            Write-Host "Inno Setup is not on this runner image; installing it"
+            choco install innosetup --no-progress --yes
+          }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6 is still not at $iscc" }
+          Write-Host "using $iscc"
+          "path=$iscc" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build the installer
+        # The version is passed in rather than written in the script, which
+        # refuses to compile without it. See packaging/ocura.iss.
+        run: |
+          & "${{ steps.iscc.outputs.path }}" /DAppVersion=${{ steps.version.outputs.version }} packaging\ocura.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+
+      - name: Check the installer exists and is not a stub
+        # A zero-byte or implausibly small file is the shape a broken compile
+        # leaves behind, and it would otherwise be published and downloaded
+        # before anyone tried to run it.
+        run: |
+          $setup = "dist\Ocura-${{ steps.version.outputs.version }}-Setup.exe"
+          if (-not (Test-Path $setup)) { throw "the installer was not produced at $setup" }
+          $mb = (Get-Item $setup).Length / 1MB
+          Write-Host ("{0} is {1:N1} MB" -f $setup, $mb)
+          if ($mb -lt 20) { throw "the installer is only $mb MB, which is too small to contain Qt" }
+
+      - name: Write the changelog from the commits since the last tag
+        # A script rather than inline PowerShell, so that it can be run against
+        # any tag on any machine before a release exists. See scripts/changelog.py.
+        run: |
+          python scripts/changelog.py "${{ github.ref_name }}" `
+            --version "${{ steps.version.outputs.version }}" `
+            --repository "${{ github.repository }}" `
+            --output release-notes.md
+
+      - name: Publish the release with the installer attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "dist\Ocura-${{ steps.version.outputs.version }}-Setup.exe" `
+            --title "Ocura ${{ steps.version.outputs.version }}" `
+            --notes-file release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed with exit code $LASTEXITCODE" }
+
+      - name: Keep the build log if anything failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-logs
+          path: |
+            pytest.log
+            release-notes.md
+          if-no-files-found: ignore
