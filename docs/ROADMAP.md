@@ -243,6 +243,15 @@ N minutes" as a reading discriminator, which would make long idle with a
 
 Windows installer, code signing, GitHub Releases.
 
+## After v1.0.0
+
+**An ubuntu CI job running the domain tests only**, as execution-level proof
+of the layer boundary. The point is not Linux support. The docs claim the
+domain layer runs without Windows; the banned-api rule in
+`src/ocura/domain/.ruff.toml` prevents the import, and running the domain
+tests on a machine with no Windows would prove it by execution. Deliberately
+its own change after the release, not an untested commit ahead of a tag.
+
 ## Explicitly out of scope
 
 **Streaks and gamification.** A streak turns a missed break into a failure, and
