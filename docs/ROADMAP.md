@@ -252,6 +252,16 @@ domain layer runs without Windows; the banned-api rule in
 tests on a machine with no Windows would prove it by execution. Deliberately
 its own change after the release, not an untested commit ahead of a tag.
 
+## v1.1
+
+**One colour temperature.** The break overlay is warm (`#1a1512`) and the main
+window and sidebar are cool (`#14171a`, `#1b1f23`), sampled from real-screen
+captures. Two temperature families in one app reads as unintentional. Pick
+one and move the other surface's tokens to it.
+
+**Style the scrollbar track.** It is unstyled Qt and shows a hatched pattern
+below the handle, in every language and on every scrolling page.
+
 ## Explicitly out of scope
 
 **Streaks and gamification.** A streak turns a missed break into a failure, and
