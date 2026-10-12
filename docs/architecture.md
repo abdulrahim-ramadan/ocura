@@ -1311,6 +1311,39 @@ work into the wrong commit twice: the presenter into
 pushed history. Stage explicit paths, always — `git add <paths>`, never `-A`
 or `.`, when a commit is meant to say one thing.
 
+**lupdate marks a plural message from Python only through `self.tr`.** Its
+Python parser sets `numerus="yes"` for `self.tr(text, "", n)` and for nothing
+else: `translate(context, text, None, n)` and
+`QCoreApplication.translate(...)` are extracted as ordinary messages, and the
+`QT_TRANSLATE_N_NOOP` markers are not recognised at all. `self.tr` takes its
+context from the class and needs Qt, which the application layer may not
+import. So a `%n` source is counted by convention, and
+`scripts/update_translations.py` sets the flag after extraction. Measured on
+PySide6 6.11.2.
+
+**lupdate strips a plural flag it did not set, and the forms with it.** A
+`numerus="yes"` message with six Arabic forms, re-extracted, comes back
+unflagged, holding the first form only, and marked unfinished. Hand-editing a
+catalogue is therefore undone by the next update, silently.
+`update_translations.py` reads the forms out before lupdate runs and writes
+them back after; never run `pyside6-lupdate` on the catalogues directly.
+
+**lupdate skips a counted call whose count is not a single token.**
+`translate("Units", "%n seconds", None, int(exact))` is not extracted, and
+nothing is printed. The same holds for an attribute, `x // 2`, `x + 1`, `x[0]`
+and a keyword `n=`; only a bare name or a number literal works, and the calls
+after the skipped one are unaffected. Work the count out into a name first.
+The skip cost three of five plural messages on the first extraction.
+
+**That skip was first misdiagnosed as `//` being read as a comment.** The
+failing calls happened to contain `int(seconds // 3600)`, the explanation
+fitted, and it went into a code comment as measured. It was not: a probe with
+`//` outside a counted call extracts fine, and `x // 2` fails only for the same
+reason `x + 1` does. Isolate one variable before writing a cause down. Both
+guards are in `tests/unit/test_catalogues.py`, which walks the AST for every
+translatable literal and fails if a catalogue lacks one: lupdate's own
+`--check` compares lupdate's output with lupdate's output, and cannot notice.
+
 ## No flag for an owed break
 
 `DEFERRED` **is** the owed break, postponed. There is no `break_owed` field
