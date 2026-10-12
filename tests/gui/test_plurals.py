@@ -1,6 +1,6 @@
 """Qt picks the plural form by each language's own rule, from the shipped .qm.
 
-`tests/unit/test_plurals.py` proves the forms are in the catalogues. This
+`tests/unit/test_catalogues.py` proves the forms are in the catalogues. This
 proves they come back out for the right numbers once compiled — that lrelease
 read the language's plural rule, that the port passes the count through, and
 that the six Arabic categories land where Arabic puts them.

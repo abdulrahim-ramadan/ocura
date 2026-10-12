@@ -1,4 +1,14 @@
-"""Every counted message carries every plural form its language has.
+"""Every string in the source reaches every catalogue, with every plural form.
+
+**lupdate fails silently, so its output is checked against the source.** Its
+Python parser extracts a counted call only when the count is a single token,
+a name or a number: `int(x)`, `x.count`, `x // 2`, `x + 1`, `x[0]` and a
+keyword `n=` each make it skip that message without a word. And
+`update_translations.py --check` cannot notice, because it compares lupdate's
+output with lupdate's output. So the strings are found here by walking the
+AST, and one lupdate never extracted fails as missing. That would otherwise
+reach the screen as English in a language that is not English, with nothing
+anywhere saying so.
 
 A count goes through Qt's numerus machinery (see `ocura.application.i18n`):
 the source holds `%n`, the catalogue holds one form per plural category, and
@@ -7,8 +17,8 @@ many (11-99), other — and German and English two each.
 
 **Nothing in the toolchain guarantees that on its own.** lupdate cannot flag
 a counted message from Python, strips a flag it did not set along with all
-but the first form, and silently skips a counted call whose count is a call
-or follows a `//`. `scripts/update_translations.py` works around all of it;
+but the first form, and silently skips a counted call whose count is an
+expression. `scripts/update_translations.py` works around all of it;
 this is what notices when the workaround stops working. So the counted
 messages are found by reading the source, not by trusting the catalogue to
 list them, and a message lupdate dropped fails here as missing.
@@ -79,6 +89,24 @@ def catalogue(language: str) -> dict[tuple[str, str], ElementTree.Element]:
         for context in root
         for message in context.findall("message")
     }
+
+
+@pytest.mark.parametrize("language", ["ar", "de"])
+def test_every_string_in_the_source_is_in_the_catalogue(language):
+    """English is the source and its catalogue holds counts only; see below."""
+    messages = catalogue(language)
+    missing = sorted(
+        f"{path.relative_to(SRC)}:{call.lineno} [{_literal(call.args[0])}] {text!r}"
+        for text, call, path in translatable_calls()
+        if (_literal(call.args[0]) or "", text) not in messages
+    )
+    assert not missing, "lupdate did not extract these:\n" + "\n".join(missing)
+
+
+def test_the_scan_finds_the_strings():
+    """A guard on the AST walk itself: one that silently stopped matching would
+    make the test above pass over nothing."""
+    assert len(translatable_calls()) > 100
 
 
 def test_the_counted_messages_are_found():

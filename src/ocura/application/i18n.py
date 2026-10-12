@@ -35,7 +35,7 @@ lupdate cannot flag these itself: its Python parser marks `numerus` only for
 `self.tr(text, "", n)`, and a later run strips a flag set by hand along with
 five of the six forms (both measured). `scripts/update_translations.py` sets
 the flag on every `%n` source after extraction and carries the forms across,
-and `tests/unit/test_plurals.py` fails if a catalogue loses one.
+and `tests/unit/test_catalogues.py` fails if a catalogue loses one.
 """
 
 from __future__ import annotations
@@ -171,9 +171,9 @@ def duration_words(seconds: float) -> str:
         return duration_text(seconds)
 
     # Every count is a plain name by the time it reaches `translate`. lupdate's
-    # Python parser silently skips a counted call whose count is itself a call,
-    # and reads floor division as the start of a C++ comment, losing the
-    # closing brackets and every call after it in the function. Both measured.
+    # Python parser extracts a counted call only when the count is one token, a
+    # name or a number; a call, an attribute or any arithmetic and the message
+    # is skipped without a word. Measured, and guarded by test_catalogues.py.
     exact = round(seconds, 3)
     hours, minutes, whole = int(seconds / 3600), int(seconds / 60), int(exact)
 
