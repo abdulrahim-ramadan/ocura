@@ -23,6 +23,19 @@ constant translated at import is fixed to whatever the language was when Python
 first read the file, which is the bug that makes a language switch look like it
 half-worked. Constants are marked with `QT_TRANSLATE_NOOP` — extracted, not
 translated — and passed through `translate` at the point of use.
+
+**A count goes through Qt's numerus machinery, never through an `if`.** A
+source containing `%n` is a counted message: `translate("Units", "%n minutes",
+None, count)`, Qt's own argument order. The catalogue carries one form per
+plural category of the language — six for Arabic, two for German and English —
+and `QTranslator` picks by that language's rule. A hand-written `if n == 1`
+gets English right and Arabic wrong in five cases out of six.
+
+lupdate cannot flag these itself: its Python parser marks `numerus` only for
+`self.tr(text, "", n)`, and a later run strips a flag set by hand along with
+five of the six forms (both measured). `scripts/update_translations.py` sets
+the flag on every `%n` source after extraction and carries the forms across,
+and `tests/unit/test_plurals.py` fails if a catalogue loses one.
 """
 
 from __future__ import annotations
@@ -34,7 +47,9 @@ from typing import Protocol, runtime_checkable
 class Translator(Protocol):
     """Turns a source string into the active language."""
 
-    def translate(self, context: str, text: str) -> str: ...
+    def translate(
+        self, context: str, text: str, disambiguation: str | None = None, n: int = -1
+    ) -> str: ...
 
 
 class NullTranslator:
@@ -43,10 +58,16 @@ class NullTranslator:
     Which is not a degraded mode. The source strings are English, so this is
     exactly what an English user gets, and it is what runs in every test that
     is not about translation.
+
+    Except for a count. A `%n` source is written in its English plural, and
+    the singular lives in the English catalogue, so without one "1 minutes" is
+    what this produces — Qt's own behaviour with no catalogue loaded.
     """
 
-    def translate(self, context: str, text: str) -> str:
-        del context
+    def translate(
+        self, context: str, text: str, disambiguation: str | None = None, n: int = -1
+    ) -> str:
+        del context, disambiguation, n
         return text
 
 
@@ -63,7 +84,7 @@ def active() -> Translator:
     return _active
 
 
-def translate(context: str, text: str) -> str:
+def translate(context: str, text: str, disambiguation: str | None = None, n: int = -1) -> str:
     """Translate, and mark the literal for extraction.
 
     Called as a bare `translate("Context", "literal")`, which is the form
@@ -71,8 +92,15 @@ def translate(context: str, text: str) -> str:
     at runtime — it is how a `QT_TRANSLATE_NOOP` constant is rendered — it just
     contributes nothing to extraction, which is correct, because the constant
     was already extracted where it was marked.
+
+    With `n`, the source holds `%n` and the catalogue picks the plural form for
+    that count; the number is substituted here, once, for every translator.
+    Western digits, for the reason `clock_text` gives.
     """
-    return _active.translate(context, text)
+    result = _active.translate(context, text, disambiguation, n)
+    if n >= 0:
+        result = result.replace("%n", str(n))
+    return result
 
 
 def QT_TRANSLATE_NOOP(context: str, text: str) -> str:
@@ -87,12 +115,11 @@ def QT_TRANSLATE_NOOP(context: str, text: str) -> str:
     return text
 
 
-#: Units, abbreviated. Ocura never writes "20 minutes" in a sentence it has to
-#: translate, because plural forms do not survive the trip: lupdate cannot tell
-#: which argument of a plain Python call is the count, so it marks nothing as
-#: `numerus`, and Arabic has six plural forms that would then have nowhere to
-#: live. An abbreviation has one form in all three languages, and every
-#: sentence that needs a duration takes it through a `%1` placeholder instead.
+#: Units, abbreviated, for figures that stand alone: a chart column, a tile, a
+#: spin box. An abbreviation is a symbol rather than a counted noun and has one
+#: form in all three languages — "3 س 40 د" is right for every number — so
+#: these stay plain `%1` messages. A duration inside a sentence is words, and
+#: goes through `duration_words`, which counts.
 
 
 def duration_text(seconds: float | None) -> str:
@@ -135,34 +162,32 @@ def duration_words(seconds: float) -> str:
     10 minutes ahead would start before the interval of 10 minutes", which is a
     refusal that reads as a contradiction and tells the user nothing.
 
-    **A known limit, stated rather than hidden.** Singular and plural are two
-    source strings here, which is right for English and German and coarse for
-    Arabic, where a dual and a small-number plural are also distinct. Qt's real
-    plural machinery needs lupdate to mark a message `numerus`, and it cannot:
-    it has no way to tell which argument of a plain Python call is the count.
-    These are configured durations, so an Arabic translator can phrase the
-    plural to read acceptably across the range a person would actually set.
+    Whole numbers are counted messages, so Arabic gets its dual and its 3-10
+    plural: "5 ثوانٍ", not "5 ثانية". A fraction of a second has no plural
+    category to pick — Qt's count is an integer — and takes the one form a
+    decimal takes in all three languages.
     """
     if seconds <= 0:
         return duration_text(seconds)
 
+    # Every count is a plain name by the time it reaches `translate`. lupdate's
+    # Python parser silently skips a counted call whose count is itself a call,
+    # and reads floor division as the start of a C++ comment, losing the
+    # closing brackets and every call after it in the function. Both measured.
+    exact = round(seconds, 3)
+    hours, minutes, whole = int(seconds / 3600), int(seconds / 60), int(exact)
+
     if seconds % 3600 == 0:
-        hours = int(seconds // 3600)
-        if hours == 1:
-            return translate("Units", "1 hour")
-        return translate("Units", "%1 hours").replace("%1", str(hours))
+        return translate("Units", "%n hours", None, hours)
 
     if seconds % 60 == 0:
-        minutes = int(seconds // 60)
-        if minutes == 1:
-            return translate("Units", "1 minute")
-        return translate("Units", "%1 minutes").replace("%1", str(minutes))
+        return translate("Units", "%n minutes", None, minutes)
 
-    exact = round(seconds, 3)
-    whole = int(exact) if exact == int(exact) else exact
-    if whole == 1:
-        return translate("Units", "1 second")
-    return translate("Units", "%1 seconds").replace("%1", f"{whole:g}")
+    if exact == whole:
+        return translate("Units", "%n seconds", None, whole)
+    return translate("Units", "%1 seconds", "a fraction, never a whole number").replace(
+        "%1", f"{exact:g}"
+    )
 
 
 def clock_text(seconds: float) -> str:

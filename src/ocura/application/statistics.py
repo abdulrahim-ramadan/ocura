@@ -309,17 +309,13 @@ class StatisticsPresenter:
                 "It has not needed to yet.",
             )
         total = sum(entry.count for entry in statistics.deferrals)
-        # Two whole sentences rather than one with a count spliced into it.
-        # "once" and "4 times" are not interchangeable fragments in German or
-        # Arabic, and a translator handed a fragment cannot fix that.
-        if total == 1:
-            return translate(
-                "Statistics",
-                "Ocura held a break back once this week rather than interrupting, and "
-                "waited for a better moment. This is why.",
-            )
+        # One counted sentence, whole, rather than a count spliced into it: the
+        # English catalogue says "once" for one, Arabic says "مرتين" for two
+        # and "%n مرات" from three to ten, and a fragment could do neither.
         return translate(
             "Statistics",
-            "Ocura held a break back %1 times this week rather than interrupting, and "
+            "Ocura held a break back %n times this week rather than interrupting, and "
             "waited for a better moment. This is why.",
-        ).replace("%1", str(total))
+            None,
+            total,
+        )

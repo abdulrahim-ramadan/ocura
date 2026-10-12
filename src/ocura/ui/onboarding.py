@@ -47,8 +47,9 @@ CUSTOM_LABEL = QT_TRANSLATE_NOOP("OnboardingDialog", "Something else — I will 
 
 #: The rhythm buttons. A whole sentence per button rather than a number with
 #: "Every" glued to the front: German puts the unit differently and Arabic
-#: reads the other way, and neither can be fixed from a fragment.
-RHYTHM_LABEL = QT_TRANSLATE_NOOP("OnboardingDialog", "Every %1 minutes")
+#: reads the other way, and neither can be fixed from a fragment. Counted, so
+#: Arabic can say "كل 5 دقائق" and "كل 20 دقيقة", which differ.
+RHYTHM_LABEL = QT_TRANSLATE_NOOP("OnboardingDialog", "Every %n minutes")
 
 
 class OnboardingDialog(QDialog):
@@ -220,9 +221,7 @@ class OnboardingDialog(QDialog):
 
     def _build_rhythms(self, view: OnboardingView) -> None:
         for index, minutes in enumerate(view.rhythm_choices):
-            button = QRadioButton(
-                translate("OnboardingDialog", RHYTHM_LABEL).replace("%1", str(minutes))
-            )
+            button = QRadioButton(translate("OnboardingDialog", RHYTHM_LABEL, None, minutes))
             button.setObjectName("OnboardingChoice")
             button.setChecked(minutes == view.chosen_minutes)
             self._rhythms.addButton(button, minutes)

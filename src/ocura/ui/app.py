@@ -489,6 +489,14 @@ def _catalogue_report(app: QApplication) -> list[str]:
     lines = []
     for language in LANGUAGE_NAMES:
         if language == SOURCE_LANGUAGE:
+            # English has only counted messages, so it is probed with one: a
+            # missing catalogue reads "1 minutes" and nothing else is wrong.
+            handle.apply(language)
+            singular = translate("Units", "%n minutes", None, 1)
+            lines.append(
+                f"catalogue {language}: {'ok' if singular == '1 minute' else 'MISSING'} "
+                f"{singular!a}"
+            )
             continue
         handle.apply(language)
         translated = translate("Tray", TRAY_PROBE)

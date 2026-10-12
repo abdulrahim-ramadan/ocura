@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 #: the one that survives being packaged into a single executable.
 CATALOGUE_PACKAGE = "ocura.ui.i18n"
 
-#: English is the source language. There is no ocura_en.qm and there should not
-#: be: the strings in the code are already English, and a catalogue that
-#: translated English to English would be a second copy of every sentence,
-#: free to disagree with the first.
+#: English is the source language. Its catalogue holds the counted messages
+#: and nothing else: a `%n` source is written in the plural, and "1 minute" or
+#: "once" has to live somewhere. Every other sentence is already English in the
+#: code, and a second copy of it would be free to disagree with the first.
 SOURCE_LANGUAGE = "en"
 
 
@@ -73,13 +73,16 @@ class QtTranslator:
     def __init__(self, translator: QTranslator | None = None) -> None:
         self._translator = translator
 
-    def translate(self, context: str, text: str) -> str:
+    def translate(
+        self, context: str, text: str, disambiguation: str | None = None, n: int = -1
+    ) -> str:
         if self._translator is None:
             return text
         # An empty result means this catalogue has no entry, which is normal
         # for English and for anything added since the last lupdate run. The
-        # source string is the answer in both cases.
-        return self._translator.translate(context, text) or text
+        # source string is the answer in both cases. `%n` is left in; the port
+        # substitutes it.
+        return self._translator.translate(context, text, disambiguation, n) or text
 
 
 class Language:
@@ -111,8 +114,9 @@ class Language:
         resolved = resolve(language)
         self._remove_existing()
 
+        # English too: its catalogue is the counted messages' singulars.
+        self._ours = self._load_ours(resolved)
         if resolved != SOURCE_LANGUAGE:
-            self._ours = self._load_ours(resolved)
             self._qt = self._load_qt(resolved)
 
         i18n.install(QtTranslator(self._ours))
