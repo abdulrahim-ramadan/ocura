@@ -243,7 +243,7 @@ N minutes" as a reading discriminator, which would make long idle with a
 
 Windows installer, code signing, GitHub Releases.
 
-## After the first release
+## After v1.0.0
 
 **An ubuntu CI job running the domain tests only**, as execution-level proof
 of the layer boundary. The point is not Linux support. The docs claim the

@@ -13,11 +13,17 @@ remembers the second, and by then the executable, the download page and the
 about-line are three different numbers.
 
 So the rule here is blunt on purpose: **the current version, as a literal, may
-appear in exactly one file in the repository.** Documentation that has to show
-a version writes `vX.Y.Z` instead of a real one, which is why the usage lines
-in `scripts/changelog.py` and the comment at the head of
+appear in exactly one source or packaging file.** Code and configuration that
+have to show a version write `vX.Y.Z` instead of a real one, which is why the
+usage lines in `scripts/changelog.py` and the comment at the head of
 `.github/workflows/release.yml` read the way they do. They are placeholders
 deliberately; replacing one with a real number is what this test is for.
+
+**Prose is not a source of truth, and is not scanned.** A roadmap heading that
+names the release it follows, a read-me that names one, a changelog: nothing
+reads a version out of them, so a stale one there is an out-of-date sentence,
+not a build that disagrees with itself. The first version of this test
+scanned markdown too, and its only catch was a roadmap heading.
 """
 
 from __future__ import annotations
@@ -45,6 +51,11 @@ ASSIGNMENT = re.compile(r'__version__ = "([^"]+)"')
 #: Read by suffix rather than sniffed, because the question is not "does this
 #: decode" but "is a version number in here something a person wrote".
 BINARY_SUFFIXES = frozenset({".db", ".ico", ".png", ".qm"})
+
+#: Written for people, read by nothing. Excluded by suffix rather than by
+#: listing what to scan, so a new kind of configuration file is checked from
+#: the day it is added instead of from the day someone remembers to list it.
+PROSE_SUFFIXES = frozenset({".md"})
 
 
 def repository_files() -> list[Path]:
@@ -98,17 +109,17 @@ def test_reading_the_file_and_importing_the_package_agree() -> None:
 
 
 def test_the_number_is_written_in_exactly_one_file() -> None:
-    """No second copy anywhere in the repository. See this module's docstring."""
+    """No second copy in any source or packaging file. See the module docstring."""
     # Bounded by digits and dots on both sides, so the number is not found
     # inside a longer one that merely contains it — a build number with a
     # fourth part, or a major version that starts with the same digits. A
-    # leading `v` is deliberately not excluded: a tag written out in a
-    # document is exactly the kind of copy this is looking for.
+    # leading `v` is deliberately not excluded: a tag written into a workflow
+    # or a script is exactly the kind of copy this is looking for.
     literal = re.compile(rf"(?<![\d.]){re.escape(ocura.__version__)}(?![\d.])")
 
     holders = []
     for path in repository_files():
-        if path.suffix.lower() in BINARY_SUFFIXES or not path.is_file():
+        if path.suffix.lower() in BINARY_SUFFIXES | PROSE_SUFFIXES or not path.is_file():
             continue
         try:
             text = path.read_text(encoding="utf-8")
