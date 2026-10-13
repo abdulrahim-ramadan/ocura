@@ -58,6 +58,32 @@ a different screen.
 The common shape of all three: the proxy was cheaper than the real thing, and
 the difference between them was exactly where the defect lived.
 
+### A test that does not set up production state tests a different program
+
+A separate category from the three above. There the method of looking was the
+proxy; here the method was right and the program under it was not the one
+users run.
+
+`tests/gui/test_minimum_width.py` drives the real `OcuraApp` at its allowed
+minimum width and fails on any clipped widget or sideways scrollbar. Its first
+version passed on the German dashboard at 723px, while a real-screen capture
+at that same width showed "Jetzt Pause machen" cut off at the edge. The test
+had shown the window but never started a session, so the first button read
+"Sitzung starten" rather than "Sitzung neu starten" — 27px narrower, and
+exactly enough for the row to fit. The test was measuring a state no user is
+in for more than the first second after launch. It now calls `start()`, as
+production does, and checks the paused labels as well.
+
+**The rule: when a test and a real-screen capture disagree, the capture wins
+until the test is proven to run the app the way production runs it.** A
+passing test that contradicts the screen is not evidence the screen is wrong.
+It is evidence the test is set up differently, and the work is finding where.
+
+What the defect actually was makes the point sharper. English clipped as well:
+at its allowed 680px, with a busy week, the statistics page slid sideways by
+48px. This was never a German edge case. It shipped to every user, and the
+German text only made it wide enough to see.
+
 ## Layers
 
 ```
