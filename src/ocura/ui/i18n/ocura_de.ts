@@ -110,37 +110,37 @@
         <translation>Am Bildschirm</translation>
     </message>
     <message>
-        <location filename="../views.py" line="216"/>
+        <location filename="../views.py" line="205"/>
         <source>This session</source>
         <translation>Diese Sitzung</translation>
     </message>
     <message>
-        <location filename="../views.py" line="217"/>
+        <location filename="../views.py" line="206"/>
         <source>Take a break now</source>
         <translation>Jetzt Pause machen</translation>
     </message>
     <message>
-        <location filename="../views.py" line="223"/>
+        <location filename="../views.py" line="211"/>
         <source>Restart session</source>
         <translation>Sitzung neu starten</translation>
     </message>
     <message>
-        <location filename="../views.py" line="223"/>
+        <location filename="../views.py" line="211"/>
         <source>Start session</source>
         <translation>Sitzung starten</translation>
     </message>
     <message>
-        <location filename="../views.py" line="226"/>
+        <location filename="../views.py" line="214"/>
         <source>Resume reminders</source>
         <translation>Erinnerungen fortsetzen</translation>
     </message>
     <message>
-        <location filename="../views.py" line="226"/>
+        <location filename="../views.py" line="214"/>
         <source>Pause reminders</source>
         <translation>Erinnerungen pausieren</translation>
     </message>
     <message>
-        <location filename="../views.py" line="247"/>
+        <location filename="../views.py" line="264"/>
         <source>Waiting — %1</source>
         <translation>Wartet — %1</translation>
     </message>
@@ -206,41 +206,41 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../main_window.py" line="33"/>
+        <location filename="../main_window.py" line="44"/>
         <source>Dashboard</source>
         <extracomment>The sidebar sections, in order. Marked rather than translated here: a constant translated at import is stuck in the language Python started in. Marked *and* rendered with an explicit context rather than `self.tr`, because `tr(variable)` extracts nothing — lupdate reads the source, it does not run it, so a table of strings has to be marked where the table is written and translated where the table is read.</extracomment>
         <translation>Übersicht</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="34"/>
+        <location filename="../main_window.py" line="45"/>
         <source>Statistics</source>
         <translation>Statistik</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="35"/>
+        <location filename="../main_window.py" line="46"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="136"/>
+        <location filename="../main_window.py" line="167"/>
         <source>Ocura</source>
-        <extracomment>The dashboard scrolls, so this is a comfort floor rather than a correctness one. Squeezed-text overlap is prevented structurally in DashboardView, not by forbidding small windows. The width is a floor in a second sense as well: it was measured in English, and German controls are wider, so `_fit_minimum_width` raises it to whatever the language on screen actually needs. Nothing lowers it. The index of the Statistics page in both the sidebar and the stack. One constant rather than a literal in each: they have to agree, and a pair of bare 1s is exactly the kind of agreement that quietly stops holding.</extracomment>
+        <extracomment>The dashboard scrolls, so this is a comfort floor rather than a correctness one. Squeezed-text overlap is prevented structurally in DashboardView, not by forbidding small windows. The width is a floor in a second sense as well: it was measured in English, and translated pages are wider, so `_fit_minimum_width` raises it to what the widest page needs in the language on screen. Nothing lowers it. The index of the Statistics page in both the sidebar and the stack. One constant rather than a literal in each: they have to agree, and a pair of bare 1s is exactly the kind of agreement that quietly stops holding.</extracomment>
         <translation>Ocura</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="137"/>
+        <location filename="../main_window.py" line="168"/>
         <source>Better screen habits.</source>
         <translation>Bessere Bildschirmgewohnheiten.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="143"/>
-        <location filename="../main_window.py" line="178"/>
+        <location filename="../main_window.py" line="174"/>
+        <location filename="../main_window.py" line="222"/>
         <source>Light theme</source>
         <translation>Helles Design</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="143"/>
-        <location filename="../main_window.py" line="178"/>
+        <location filename="../main_window.py" line="174"/>
+        <location filename="../main_window.py" line="222"/>
         <source>Dark theme</source>
         <translation>Dunkles Design</translation>
     </message>

@@ -192,17 +192,6 @@ class DashboardView(QWidget):
         root.addStretch(0)
         self.retranslate()
 
-    def minimum_content_width(self) -> int:
-        """The narrowest this page can be and still show all three controls.
-
-        Buttons are the one thing on the page that cannot wrap, and their
-        width is a fact about the language: "Erinnerungen pausieren" is half
-        again as wide as "Pause reminders". The window asks for this after
-        every language change rather than trusting a minimum size that was
-        measured once, in English.
-        """
-        return self._buttons.sizeHint().width() + 2 * SPACING.lg
-
     def retranslate(self) -> None:
         """Re-set every string this widget owns, in the language now active.
 
@@ -216,15 +205,43 @@ class DashboardView(QWidget):
         self._events_title.setText(self.tr("This session"))
         self._break.setText(self.tr("Take a break now"))
         self._retranslate_buttons()
+        self.reserve_label_widths()
+
+    def _start_labels(self) -> tuple[str, str]:
+        return self.tr("Start session"), self.tr("Restart session")
+
+    def _pause_labels(self) -> tuple[str, str]:
+        return self.tr("Pause reminders"), self.tr("Resume reminders")
 
     def _retranslate_buttons(self) -> None:
         """The two buttons whose label depends on state as well as language."""
-        self._start.setText(
-            self.tr("Restart session") if self._running else self.tr("Start session")
-        )
-        self._pause.setText(
-            self.tr("Resume reminders") if self._paused else self.tr("Pause reminders")
-        )
+        start, restart = self._start_labels()
+        pause, resume = self._pause_labels()
+        self._start.setText(restart if self._running else start)
+        self._pause.setText(resume if self._paused else pause)
+
+    def reserve_label_widths(self) -> None:
+        """Size each relabelling button for the widest thing it can say.
+
+        Otherwise the page's minimum depends on the session's state: in German
+        "Sitzung neu starten" is 27px wider than "Sitzung starten", so a
+        minimum measured before a session started was too narrow for the one
+        after. Asked on a language change, and by the window before every
+        measurement of its minimum, which is what catches a style change;
+        never on a tick, because it sets each label in turn to measure it.
+        """
+        for button, labels in (
+            (self._start, self._start_labels()),
+            (self._pause, self._pause_labels()),
+        ):
+            button.ensurePolished()
+            current = button.text()
+            widths = []
+            for label in labels:
+                button.setText(label)
+                widths.append(button.sizeHint().width())
+            button.setText(current)
+            button.setMinimumWidth(max(widths))
 
     def changeEvent(self, event) -> None:
         if event.type() == QEvent.Type.LanguageChange:

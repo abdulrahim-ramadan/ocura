@@ -1,12 +1,23 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QEvent, QPoint, QRect, QSettings, QSize, Qt, Signal
+from PySide6.QtCore import (
+    QByteArray,
+    QEvent,
+    QPoint,
+    QRect,
+    QSettings,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import QCloseEvent, QGuiApplication, QIcon
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
     QMainWindow,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -42,9 +53,29 @@ DEFAULT_SIZE = QSize(880, 660)
 #: forbidding small windows.
 #:
 #: The width is a floor in a second sense as well: it was measured in English,
-#: and German controls are wider, so `_fit_minimum_width` raises it to whatever
-#: the language on screen actually needs. Nothing lowers it.
+#: and translated pages are wider, so `_fit_minimum_width` raises it to what
+#: the widest page needs in the language on screen. Nothing lowers it.
 MIN_SIZE = QSize(680, 520)
+
+
+def page_minimum_width(page: QWidget) -> int:
+    """The narrowest this page can be with nothing cut off and no sideways scroll.
+
+    Every page is the same shape — a capped column in a scroll area, inside
+    the page's own margins — so one measurement serves all of them. The
+    vertical scrollbar is counted whether or not it is showing: a page that
+    fits until its content grows tall enough to need one would then slide
+    sideways by exactly its width.
+    """
+    scroller = page.findChild(QScrollArea, "Page")
+    margins = page.layout().contentsMargins()
+    return (
+        margins.left()
+        + margins.right()
+        + 2 * scroller.frameWidth()
+        + scroller.widget().minimumSizeHint().width()
+        + scroller.verticalScrollBar().sizeHint().width()
+    )
 
 
 class MainWindow(QMainWindow):
@@ -142,34 +173,47 @@ class MainWindow(QMainWindow):
         self._theme_button.setText(
             self.tr("Light theme") if self._theme_is_dark else self.tr("Dark theme")
         )
-        self._fit_minimum_width()
+        self._refit_later()
 
     def _fit_minimum_width(self) -> None:
-        """Make the window impossible to shrink past its own controls.
+        """Make the window impossible to shrink past the widest page.
 
-        The page scrolls sideways if it has to — that is the safety net, and
-        it stays — but a window that cannot be made too narrow in the first
-        place is the better answer, and what "too narrow" means changes with
-        the language.
+        Every page, not the one on screen: a minimum that suited the dashboard
+        let Statistics slide sideways the moment it was opened, and in German
+        Statistics is the widest page by seventy pixels. The page scrolls
+        sideways if it has to — that safety net stays — but
+        `tests/gui/test_minimum_width.py` holds it to never being needed.
 
-        Asked again on show and on a style change, because a button's width is
-        not knowable until the stylesheet that pads it has been applied: at
-        construction the German row measures 80px narrower than it turns out
-        to be, which is exactly the margin that decides this.
+        Polished first, because a button's width is not knowable until the
+        stylesheet that pads it has been applied: unpolished, the German
+        dashboard row measures 27px narrower than it draws.
         """
-        self.setMinimumWidth(
-            max(MIN_SIZE.width(), LAYOUT.sidebar_width + self.dashboard.minimum_content_width())
-        )
+        self.ensurePolished()
+        self.dashboard.reserve_label_widths()
+        widest = max(page_minimum_width(self._pages.widget(i)) for i in range(self._pages.count()))
+        self.setMinimumWidth(max(MIN_SIZE.width(), LAYOUT.sidebar_width + widest))
+
+    def _refit_later(self) -> None:
+        """Measure once the events already queued have been handled.
+
+        A language change reaches every widget as its own posted event, and
+        this window's arrives before its pages' do; measured on the spot, the
+        minimum is the previous language's, which is what it used to be — one
+        language behind on every switch. A style change is the same story with
+        each button's cached size. Queued behind them, the measurement sees
+        the text and the padding that will actually be drawn.
+        """
+        QTimer.singleShot(0, self._fit_minimum_width)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
-        self._fit_minimum_width()
+        self._refit_later()
 
     def changeEvent(self, event) -> None:
         if event.type() == QEvent.Type.LanguageChange:
             self.retranslate()
         elif event.type() == QEvent.Type.StyleChange:
-            self._fit_minimum_width()
+            self._refit_later()
         super().changeEvent(event)
 
     def set_theme_name(self, name: str) -> None:
@@ -197,6 +241,8 @@ class MainWindow(QMainWindow):
         # rearranges itself under the reader.
         if index == self.STATISTICS:
             self.statistics.refresh()
+            # A week's totals are text, and a longer week is wider text.
+            self._refit_later()
         MOTION.fade_in(self._pages.currentWidget())
 
     def render(self, view: SessionView) -> None:
@@ -207,6 +253,7 @@ class MainWindow(QMainWindow):
         # numbers: the process outlives the day it started in.
         if self._pages.currentIndex() == self.STATISTICS:
             self.statistics.refresh()
+            self._refit_later()
         if self.isMinimized():
             self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
         self.show()
