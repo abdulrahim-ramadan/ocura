@@ -262,6 +262,14 @@ one and move the other surface's tokens to it.
 **Style the scrollbar track.** It is unstyled Qt and shows a hatched pattern
 below the handle, in every language and on every scrolling page.
 
+**Let the statistics tiles wrap to two rows.** Four tiles side by side are the
+widest thing in the app: in German, "Durchschnittlicher Fokusblock" makes the
+row 570px and sets the window minimum at 826px (measured). Wrapped, the
+dashboard's button row sets it instead, at roughly 760px — closer to the 683px
+of half-screen snapping on a 1366px laptop. An improvement, not a correction:
+the v1.0.0 minimum already fits every page, which
+`tests/gui/test_minimum_width.py` holds it to.
+
 ## Explicitly out of scope
 
 **Streaks and gamification.** A streak turns a missed break into a failure, and
