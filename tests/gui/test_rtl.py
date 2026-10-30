@@ -37,7 +37,10 @@ def language(qapp):
     handle = Language(qapp)
     was = qapp.layoutDirection()
     yield handle
-    handle.apply(ENGLISH)
+    # Off, not back to English: applying English installs a catalogue the
+    # test did not start with. The translator global is put back by the
+    # autouse `own_translator`.
+    handle._remove_existing()
     qapp.setLayoutDirection(was)
 
 

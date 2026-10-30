@@ -58,6 +58,24 @@ def own_stylesheet(qapp):
 
 
 @pytest.fixture(autouse=True)
+def own_translator():
+    """Every test starts with Ocura's translator as it found it.
+
+    The same leak as the stylesheet, one module over. `i18n.install` sets a
+    global every later `translate` call goes through, and the language
+    fixtures used to "restore" by applying English — which installs the
+    English catalogue rather than removing anything. Every test after them,
+    in this directory and in tests/unit, then ran with that catalogue, and
+    one unit test passed only because of it: alone, it failed.
+    """
+    from ocura.application import i18n
+
+    was = i18n.active()
+    yield
+    i18n.install(was)
+
+
+@pytest.fixture(autouse=True)
 def still():
     """Widget tests assert final values, so motion is off unless asked for.
 

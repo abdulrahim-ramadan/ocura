@@ -19,7 +19,10 @@ def language(qapp):
     handle = Language(qapp)
     was = qapp.layoutDirection()
     yield handle
-    handle.apply("en")
+    # Off, not back to English: applying English installs a catalogue the
+    # test did not start with. The translator global is put back by the
+    # autouse `own_translator`.
+    handle._remove_existing()
     qapp.setLayoutDirection(was)
 
 
@@ -77,3 +80,36 @@ def test_english_says_once_rather_than_one_times(language):
         1,
     )
     assert "once this week" in note
+
+
+def test_one_deferral_is_not_described_as_one_times(language):
+    """ "1 times" is what the source text says with no catalogue loaded; the
+    singular, "once", lives in the English catalogue. So this asserts catalogue
+    output and installs the catalogue itself. It used to live in
+    tests/unit/test_statistics.py and pass only when a test here had run first
+    and left English installed."""
+    from datetime import date, timedelta
+
+    from ocura.application.statistics import (
+        WINDOW_DAYS,
+        DayTotals,
+        ReasonCount,
+        Statistics,
+        StatisticsPresenter,
+    )
+
+    class OneReason:
+        def read(self, days: int = WINDOW_DAYS) -> Statistics:
+            first = date(2026, 9, 14)
+            return Statistics(
+                days=tuple(
+                    DayTotals(
+                        day=first + timedelta(days=n), screen_seconds=0.0, breaks=0, focus_blocks=0
+                    )
+                    for n in range(days)
+                ),
+                deferrals=(ReasonCount("Screen locked", 1),),
+            )
+
+    language.apply("en")
+    assert "once" in StatisticsPresenter(OneReason()).view().deferrals_note
