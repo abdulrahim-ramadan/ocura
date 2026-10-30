@@ -43,8 +43,13 @@ HANDOVER = DIST / "Ocura"
 #: when somebody runs the download.
 MINIMUM_INSTALLER_MB = 20
 
+#: Every tool is run as `python -m <module>` through this interpreter, never
+#: as an .exe found next to it. In a venv the two sit in one folder; on the
+#: release runner Python is not a venv, pip puts the .exe files in a Scripts
+#: folder beside python.exe, and the first tagged release failed on exactly
+#: that (`FileNotFoundError` launching pyinstaller.exe) after every local
+#: build had passed.
 PYTHON = Path(sys.executable)
-SCRIPTS = PYTHON.parent
 
 LICENCES = ("LGPL-3.0.txt", "GPL-3.0.txt", "THIRD_PARTY_NOTICES.md")
 
@@ -91,8 +96,8 @@ def run(label: str, command: list[str]) -> None:
 
 def gate() -> None:
     """Lint and tests, before anything is packaged."""
-    run("ruff check", [str(SCRIPTS / "ruff.exe"), "check", "."])
-    run("ruff format --check", [str(SCRIPTS / "ruff.exe"), "format", "--check", "."])
+    run("ruff check", [str(PYTHON), "-m", "ruff", "check", "."])
+    run("ruff format --check", [str(PYTHON), "-m", "ruff", "format", "--check", "."])
     run("pytest", [str(PYTHON), "-m", "pytest", "-q"])
 
 
@@ -171,7 +176,9 @@ def build() -> None:
     run(
         "pyinstaller",
         [
-            str(SCRIPTS / "pyinstaller.exe"),
+            str(PYTHON),
+            "-m",
+            "PyInstaller",
             str(SPEC),
             "--noconfirm",
             "--distpath",

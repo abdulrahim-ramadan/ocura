@@ -9,4 +9,4 @@ Bumping Ocura is therefore one edit, and `tests/unit/test_version.py` fails if
 a second copy of the number appears anywhere in the repository.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
