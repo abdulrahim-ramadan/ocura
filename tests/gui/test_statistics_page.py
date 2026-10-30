@@ -15,8 +15,9 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from PySide6.QtCore import QSize
-from PySide6.QtGui import QImage, QPalette
+from PySide6.QtCore import QPoint, QSize
+from PySide6.QtGui import QImage, QPalette, QRegion
+from PySide6.QtWidgets import QWidget
 
 from ocura.application.statistics import DayBar, DeferralLine, StatisticsPageView
 from ocura.ui.statistics import Bar, ReasonRow, StatisticsPage
@@ -140,37 +141,45 @@ def test_rendering_twice_does_not_leave_the_first_chart_behind(page, qtbot):
 # --- what the bars actually paint ------------------------------------------
 
 
-def painted(bar, size: QSize) -> tuple[QImage, int]:
-    """Render one bar on its own, and say which colour its paintEvent used.
+#: What the bar is told to paint, through its own stylesheet, which outranks
+#: whatever stylesheet another test left on the application.
+BAR_COLOUR = 0xFFC03A8A
+
+#: What the image holds before the bar paints. Neither the bar nor anything
+#: in the theme paints it, so a pixel still this colour was not painted.
+UNPAINTED = 0xFF00FF00
+
+
+def painted(bar, size: QSize) -> QImage:
+    """Render one bar on its own over the sentinel, in a colour set here.
 
     A bar that is wired up correctly and draws along the wrong axis passes
     every test that only reads `_fraction` back. This one does not.
 
-    The colour is read off the bar rather than forced onto it. `QWidget.render`
-    fills the background first, so "any opaque pixel" is not the bar; and a
-    palette set here would lose to whatever stylesheet is on the application,
-    which another test module may well have left there.
+    The colour is set, not read back. Read back, it was whatever the palette
+    happened to hold: a theme colour when an earlier module had left its
+    stylesheet on the application, and the system's translucent text colour
+    when none had, which no painted pixel ever equals. The test then agreed
+    or disagreed with the run order rather than with the bar.
     """
+    bar.setStyleSheet(f"color: #{BAR_COLOUR & 0xFFFFFF:06x};")
     bar.ensurePolished()
     bar.resize(size)
 
     image = QImage(size, QImage.Format.Format_ARGB32)
-    image.fill(0)
-    bar.render(image)
-
-    colour = bar.palette().color(QPalette.ColorRole.WindowText).rgb()
-    background = bar.palette().color(QPalette.ColorRole.Window).rgb()
-    assert colour != background, "the bar and what it is drawn on are the same colour"
-    return image, colour
+    image.fill(UNPAINTED)
+    # Children only: the default flags fill the window background first, and
+    # the sentinel would be painted over before the bar ever drew.
+    bar.render(image, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren)
+    return image
 
 
-def is_bar(shot: tuple[QImage, int], x: int, y: int) -> bool:
-    image, colour = shot
-    return image.pixelColor(x, y).rgb() == colour
+def is_bar(image: QImage, x: int, y: int) -> bool:
+    return image.pixelColor(x, y).rgba() == BAR_COLOUR
 
 
-def bar_pixels(shot: tuple[QImage, int], y: int, width: int) -> int:
-    return sum(1 for x in range(width) if is_bar(shot, x, y))
+def bar_pixels(image: QImage, y: int, width: int) -> int:
+    return sum(1 for x in range(width) if is_bar(image, x, y))
 
 
 def test_a_chart_bar_grows_from_the_bottom(qtbot):

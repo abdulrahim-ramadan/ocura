@@ -13,8 +13,9 @@ screenshot can only suggest and a reader of the source cannot check at all.
 from __future__ import annotations
 
 import pytest
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QImage, QPalette
+from PySide6.QtCore import QPoint, QSize, Qt
+from PySide6.QtGui import QImage, QRegion
+from PySide6.QtWidgets import QWidget
 
 from ocura.application.i18n import clock_text
 from ocura.application.settings import is_rtl
@@ -62,19 +63,36 @@ def test_the_direction_is_a_fact_about_the_language_not_about_the_catalogue():
 # --- what Qt does not mirror ----------------------------------------------
 
 
-def painted(bar: Bar, size: QSize) -> tuple[QImage, int]:
-    """One bar, rendered on its own, and the colour its paintEvent used."""
+#: What the bar is told to paint, through its own stylesheet, which outranks
+#: whatever stylesheet another test left on the application.
+BAR_COLOUR = 0xFFC03A8A
+
+#: What the image holds before the bar paints. Neither the bar nor anything
+#: in the theme paints it, so a pixel still this colour was not painted.
+UNPAINTED = 0xFF00FF00
+
+
+def painted(bar: Bar, size: QSize) -> QImage:
+    """One bar, rendered on its own over the sentinel, in a colour set here.
+
+    The colour is set, not read back. Read back, it was whatever the palette
+    happened to hold — the system's translucent text colour in light mode,
+    which no painted pixel ever equals — and the test agreed or disagreed with
+    the environment rather than with the bar.
+    """
+    bar.setStyleSheet(f"color: #{BAR_COLOUR & 0xFFFFFF:06x};")
     bar.ensurePolished()
     bar.resize(size)
     image = QImage(size, QImage.Format.Format_ARGB32)
-    image.fill(0)
-    bar.render(image)
-    return image, bar.palette().color(QPalette.ColorRole.WindowText).rgb()
+    image.fill(UNPAINTED)
+    # Children only: the default flags fill the window background first, and
+    # the sentinel would be painted over before the bar ever drew.
+    bar.render(image, QPoint(), QRegion(), QWidget.RenderFlag.DrawChildren)
+    return image
 
 
-def is_bar(shot: tuple[QImage, int], x: int, y: int) -> bool:
-    image, colour = shot
-    return image.pixelColor(x, y).rgb() == colour
+def is_bar(image: QImage, x: int, y: int) -> bool:
+    return image.pixelColor(x, y).rgba() == BAR_COLOUR
 
 
 def test_a_deferral_bar_grows_from_the_edge_the_row_is_read_from(qtbot):
