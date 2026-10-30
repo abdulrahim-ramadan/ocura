@@ -29,10 +29,12 @@ class WindowsContext:
         chain: DetectorChain,
         observers: Sequence[Callable[[], None]] = (),
         idle: IdleDetector | None = None,
+        clock: MonotonicClock | None = None,
     ) -> None:
         self._chain = chain
         self._observers = tuple(observers)
         self._idle = idle
+        self._clock = clock
 
     @property
     def detectors(self) -> tuple[ContextDetector, ...]:
@@ -48,6 +50,33 @@ class WindowsContext:
         """
         if self._idle is not None:
             self._idle.set_threshold(seconds)
+
+    @property
+    def away_after(self) -> float:
+        """The idle threshold: past it, Ocura neither interrupts nor counts.
+
+        It is a setting, so "away" moves with it. Someone who sets ten minutes
+        has up to ten minutes of each absence counted as time at the screen —
+        they said what counts as away, and one definition serving both
+        decisions is the point. Infinite without an idle detector: nothing is
+        ever taken out of a block on evidence that is not there.
+        """
+        return self._idle.threshold if self._idle is not None else float("inf")
+
+    def last_input(self) -> float:
+        """The latest input as a monotonic moment.
+
+        Monotonic time minus GetLastInputInfo's idle count. The two are
+        different counters, but both include time asleep and agree to within
+        0.05 s across a sleep (measured 2026-10-30), which is what lets an
+        absence that spans one be placed on the monotonic clock at all.
+        """
+        if self._clock is None:
+            return 0.0
+        if self._idle is None:
+            # No idle signal, so no evidence of absence: input is always "now".
+            return self._clock.monotonic()
+        return self._clock.monotonic() - self._idle.idle_seconds()
 
     def poll(self) -> None:
         for observe in self._observers:
@@ -75,4 +104,4 @@ def build_windows_context(
         PresentationDetector(api.is_presenting),
         ScreensaverDetector(api.is_screensaver_running),
     )
-    return WindowsContext(chain, observers=(lock.observe,), idle=idle)
+    return WindowsContext(chain, observers=(lock.observe,), idle=idle, clock=clock)

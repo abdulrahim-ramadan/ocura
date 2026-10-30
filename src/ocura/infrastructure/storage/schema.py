@@ -34,7 +34,7 @@ from datetime import UTC, datetime
 from ocura.infrastructure.storage.errors import FutureSchemaError
 
 #: What this build writes and expects to read.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 #: The migration ledger. Not listed in MIGRATIONS on purpose: it has to exist
 #: before the first step can record itself, including on a file that is being
@@ -94,6 +94,19 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
             value TEXT NOT NULL
         )
         """,
+    ),
+    (
+        # The focus block a row closed, in seconds at the screen. Before this,
+        # each BREAK_DUE carried the time since its block began, and was
+        # written again on every retry of a deferred break, so the statistics
+        # page summed one absence into hundreds of hours. A block is now
+        # measured once, on the row that ends it, in a column of its own
+        # because that row is usually about another span: the break.
+        #
+        # Nothing is backfilled. Old BREAK_DUE durations cannot be told apart
+        # into blocks, retries and absences after the fact, and no released
+        # build ever wrote them.
+        "ALTER TABLE events ADD COLUMN focus REAL",
     ),
 )
 

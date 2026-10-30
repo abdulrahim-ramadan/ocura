@@ -13,14 +13,21 @@ thing. `datetime.astimezone` does that conversion exactly, including across a
 DST change, so the range filter is done in SQL over UTC text and the bucketing
 is done here.
 
-**What "at the screen" is counted from.** The measured duration on each
-`BREAK_DUE` row, which is the focus block that earned the break, taken from the
-monotonic clock at the moment it completed. Not the wall-clock gap between
-events: a laptop that slept for three hours between two rows would turn that
-sleep into three hours of screen time. The cost of that choice is that a block
-still running, or one ended by stopping the session before a break came due, is
-not counted — the page says so in as many words, and a number that is honestly
-incomplete beats one that is silently wrong.
+**What "at the screen" is counted from.** The `focus` on the row that closed
+each block — a break finished or skipped, a rest credited, the session stopped
+or restarted — measured on the monotonic clock with every absence past the idle
+threshold taken out, sleep included. Not the wall-clock gap between events, and
+no longer the duration on `BREAK_DUE`: that was written again on every retry of
+a deferred break, each time carrying the whole stretch so far, and it summed
+one 57-hour absence into a week of 3,997 hours. A block still running is not
+counted until it ends, and one lost to a crash is not counted at all; the page
+says it counts finished blocks, and a number that is honestly incomplete beats
+one that is silently wrong.
+
+**A block belongs to the day it closed.** One that runs from 23:50 to 00:10 is
+counted whole on the new day. The row says how long the block was, not when
+each minute of it happened — absences and pauses inside it are already gone —
+so splitting it at midnight would be inventing the split.
 """
 
 from __future__ import annotations
@@ -85,18 +92,15 @@ class StatisticsStore:
         breaks: Counter[date] = Counter()
         reasons: Counter[str] = Counter()
 
-        for at, kind, detail, duration in rows:
+        for at, kind, detail, focus in rows:
             day = _local(datetime.fromisoformat(at), zone).date()
-            if kind == SessionEventKind.BREAK_DUE:
-                # A block is counted on the day it finished. One that ran
-                # across midnight belongs to the day it ended on rather than
-                # being split: the row records how long it was, not when each
-                # minute of it happened, and inventing the split would be
-                # inventing data.
-                if duration is not None:
-                    screen[day] = screen.get(day, 0.0) + float(duration)
-                    blocks[day] += 1
-            elif kind in _BREAK_HAPPENED:
+            # Any kind can close a block, so this is not part of the match on
+            # kind below. A block of no time at all — a restart the instant
+            # after a start — is not a block.
+            if focus is not None and focus > 0:
+                screen[day] = screen.get(day, 0.0) + float(focus)
+                blocks[day] += 1
+            if kind in _BREAK_HAPPENED:
                 breaks[day] += 1
             elif kind == SessionEventKind.BREAK_DEFERRED and detail:
                 reasons[normalise(detail)] += 1
@@ -123,8 +127,7 @@ class StatisticsStore:
         """Half-open: the last day's midnight belongs to the day after it."""
         try:
             return self._connection.execute(
-                "SELECT at, kind, detail, duration FROM events "
-                "WHERE at >= ? AND at < ? ORDER BY id",
+                "SELECT at, kind, detail, focus FROM events WHERE at >= ? AND at < ? ORDER BY id",
                 (start.astimezone(UTC).isoformat(), end.astimezone(UTC).isoformat()),
             ).fetchall()
         except sqlite3.Error as exc:

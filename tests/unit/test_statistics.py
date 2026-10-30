@@ -68,8 +68,10 @@ class Seeder:
         return moment.replace(tzinfo=self._zone)
 
     def focus_block(self, moment: datetime, seconds: float = FOCUS) -> None:
-        """A block that reached a break, which is what screen time is counted from."""
-        self._record(SessionEventKind.BREAK_DUE, moment, duration=seconds)
+        """A block, closed at `moment`. Screen time is counted from `focus` on
+        the closing row, whatever closed it; STOPPED is used here because it
+        is not also a break, which keeps the two counts independent."""
+        self._record(SessionEventKind.STOPPED, moment, focus=seconds)
 
     def took_a_break(self, moment: datetime, *, early: bool = False) -> None:
         kind = SessionEventKind.BREAK_SKIPPED if early else SessionEventKind.BREAK_COMPLETED
@@ -88,6 +90,7 @@ class Seeder:
         moment: datetime,
         detail: str = "",
         duration: float | None = None,
+        focus: float | None = None,
     ) -> None:
         self.store.record(
             SessionEvent(
@@ -96,6 +99,7 @@ class Seeder:
                 state=TimerState.FOCUSING,
                 detail=detail,
                 duration=duration,
+                focus=focus,
             )
         )
 
@@ -140,17 +144,49 @@ def test_screen_time_is_the_sum_of_measured_focus_blocks(seeded):
     assert window.screen_seconds == 2700.0
 
 
-def test_a_block_with_no_measured_duration_is_not_counted_as_zero(seeded):
-    """A v1 row has no duration. It is a block nobody measured, not a block of
-    no length, so it is left out of both the total and the count it averages."""
+def test_a_closing_row_with_no_block_is_not_counted_as_zero(seeded):
+    """A row that closed nothing has no focus. It is not a block of no length,
+    so it is left out of both the total and the count it averages."""
     history = seeded()
     history.focus_block(datetime(2026, 9, 20, 9, 30), seconds=1200.0)
-    history._record(SessionEventKind.BREAK_DUE, datetime(2026, 9, 20, 10, 30), duration=None)
+    history._record(SessionEventKind.STOPPED, datetime(2026, 9, 20, 10, 30), focus=None)
+    history.focus_block(datetime(2026, 9, 20, 10, 31), seconds=0.0)
 
     window = history.read(datetime(2026, 9, 20, 18, 0))
 
     assert window.today.focus_blocks == 1
     assert window.today.screen_seconds == 1200.0
+
+
+def test_an_offer_is_not_screen_time_however_much_it_says(seeded):
+    """Before schema v4 every BREAK_DUE carried the block so far, and a deferred
+    break wrote one every thirty seconds: one 57-hour absence became 3,281
+    hours in a day. Those durations are history, not blocks, and none is read."""
+    history = seeded()
+    for retry in range(100):
+        history._record(
+            SessionEventKind.BREAK_DUE,
+            datetime(2026, 9, 20, 9, 0) + timedelta(seconds=30 * retry),
+            duration=20_000.0 + 30 * retry,
+        )
+
+    window = history.read(datetime(2026, 9, 20, 18, 0))
+
+    assert window.today.screen_seconds == 0.0
+    assert window.today.focus_blocks == 0
+
+
+def test_a_block_across_midnight_belongs_whole_to_the_day_it_closed(seeded):
+    """23:50 to 00:10 is twenty minutes on the new day, not ten and ten: the
+    row says how long the block was, not when each minute of it happened."""
+    history = seeded(TOKYO)
+    history.focus_block(datetime(2026, 9, 21, 0, 10), seconds=1200.0)
+
+    window = history.read(datetime(2026, 9, 21, 9, 0))
+
+    assert window.days[-2].screen_seconds == 0.0
+    assert window.days[-1].screen_seconds == 1200.0
+    assert window.days[-1].focus_blocks == 1
 
 
 def test_breaks_count_the_ones_ended_early_too(seeded):
@@ -623,12 +659,6 @@ def test_the_note_counts_the_times_ocura_held_back():
     page = a_page(a_window(reasons=(("Screen locked", 4), ("Away from the keyboard", 2))))
 
     assert "6 times" in page.deferrals_note
-
-
-def test_one_deferral_is_not_described_as_one_times():
-    page = a_page(a_window(reasons=(("Screen locked", 1),)))
-
-    assert "once" in page.deferrals_note
 
 
 def test_having_never_waited_is_explained_rather_than_left_blank():

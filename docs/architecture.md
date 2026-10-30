@@ -134,6 +134,19 @@ exists first. The check is to run each GUI file alone in forced light mode
 (`QT_QPA_PLATFORM=windows:darkmode=0`), because the runner is in light mode and
 light mode is where these failures appeared.
 
+**The check is every file, not every GUI file.** A day later the same leak
+turned up one module over. The `language` fixtures in `test_plurals.py` and
+`test_rtl.py` "restored" by applying English, which installs the English
+catalogue as Ocura's global translator instead of removing anything. Every
+later test, `tests/unit` included, ran with it. `test_one_deferral_is_not_described_as_one_times`
+asserted the catalogue's singular, "once", from `tests/unit`, and passed only
+when a GUI test had run first. Alone it failed (MEASURED at `0373891`). It now
+lives in `tests/gui/test_plurals.py` and installs English itself. The fixtures
+take their translators off. An autouse `own_translator` beside
+`own_stylesheet` puts the global back after every test. Verified on
+2026-10-30: every test file alone, `tests/unit` alone, `tests/gui` alone, and
+both directories in either order.
+
 ## Layers
 
 ```
@@ -341,6 +354,21 @@ detector, so a future signal can feed it without restructuring: P6 may add
 "idle **and** the foreground window has not changed for N minutes" as a reading
 discriminator, at which point long idle with a *changed* window becomes
 creditable. That is not built now, and idle remains non-creditable until it is.
+
+### And long idle is not time at the screen either
+
+That does not contradict the rule above. Both are the same principle applied to
+two different questions: **do not claim what you do not know.**
+
+- *Did they rest?* Ocura refuses to say yes, because a reader looks like an
+  empty chair, and the cost of a wrong yes is a missed break.
+- *Were they at the screen?* Ocura refuses to say yes too, because nobody sat
+  through 57 hours with no input, and the cost of a wrong yes is a headline
+  number the user knows is false.
+
+It is the same refusal in opposite directions, because the questions differ.
+Past the idle threshold, absence neither discharges a break nor counts towards
+one. See [Where that rule stops: an empty chair](#where-that-rule-stops-an-empty-chair).
 
 ## The P1 Windows context layer
 
@@ -795,6 +823,14 @@ the cap limits a run of postponements rather than a day of them.
 One SQLite file, written by `ocura.infrastructure.storage` and reached from
 above through a protocol that never mentions a database.
 
+The file is `%LOCALAPPDATA%\Ocura\ocura.db`, except when Ocura runs from source
+on a Microsoft Store Python. Windows then redirects the whole of
+`%LOCALAPPDATA%` into the Store package, so the file is
+`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.13_<id>\LocalCache\Local\Ocura\ocura.db`.
+Python still reports the documented path, and the from-source run keeps a
+history separate from the installed app's. See
+[Tooling gotchas](#tooling-gotchas).
+
 ### The seam
 
 `SessionJournal` (`application/journal.py`) is one method: `record(event)`.
@@ -959,14 +995,46 @@ pointed at another one for a test, so the range filter runs in SQL over UTC
 text and `datetime.astimezone` does the conversion. The tests drive it at fixed
 offsets on both sides of UTC, across a midnight, a month end and a year end.
 
-**"At the screen" is the sum of measured focus blocks**, taken from the
-`duration` on each `BREAK_DUE` row — a monotonic measurement made when the
-block completed. Not the wall-clock gap between rows: a laptop that slept for
-three hours between two events would book that sleep as three hours of screen
-time. The cost is that a block still running, or one ended by stopping the
-session before a break came due, is not counted, so today's figure can lag by
-up to one focus interval. The page says as much in its own subheading. A number
-that is honestly incomplete beats one that is silently wrong.
+**"At the screen" is the sum of focus blocks, each measured once, when it
+closes.** A block closes when its focus stopwatch is reset: a break finished or
+skipped, a rest credited, the session stopped or restarted. The row that closes
+it carries the block in its own `focus` column (schema v4). It isn't in
+`duration`, because that row is usually about another span, the break. A break
+postponed from the break screen does not close its block. The stretch carries
+on and is counted once when it does end. Absences past the idle threshold,
+sleep included, are already out of the measurement (see [Where that rule stops:
+an empty chair](#where-that-rule-stops-an-empty-chair)).
+
+This replaced the `duration` on `BREAK_DUE`, which measured the wrong end of the
+block. It was written again on every retry of a deferred break, each time
+carrying the whole stretch so far, and summed one absence into hundreds of
+hours. Old `BREAK_DUE` durations are not read. Nothing is backfilled: no
+released build ever wrote them, and they cannot be untangled into blocks,
+retries and absences after the fact.
+
+**What a crash costs.** A block that never closes is never counted. A clean quit
+writes `STOPPED`, so the gap is a crash or a power cut, and it loses at most the
+block that was running. That is acceptable for a statistics feature, and it is
+written here so that it is not found later. Today's figure also lags by the
+block still running. The page says it counts finished blocks, and a number that
+is honestly incomplete beats one that is silently wrong.
+
+**A block belongs to the day it closed.** One running from 23:50 to 00:10 counts
+twenty minutes on the new day, not ten and ten. The row says how long the block
+was, not when each minute of it happened, and pauses and absences inside it are
+already gone, so splitting it at midnight would mean inventing the split. When
+every `BREAK_DUE` carried cumulative time this question did not arise. It does
+now, and a test pins the answer.
+
+**One row per occurrence, not per tick.** `BREAK_DUE` is written once per block,
+the first time its break comes due. A retry re-offering a break already owed is
+the engine asking again, not a break coming due. A detector's `BREAK_DEFERRED`
+is written once on entering a deferral, with the reason that caused it. Staying
+deferred is a state, and the thirty-second re-asking is not an event. A snooze is
+always written, because it is the user deciding. The dashboard still shows the
+*current* reason while the break waits. The log keeps the reason the deferral
+began with. A deferral whose cause changes part-way, for example from away to
+fullscreen, is counted under its first cause only.
 
 **Deferral reasons are folded into families.** The idle detector writes its
 measurement into its reason — `idle for 312s` — so grouping on the raw string
@@ -1376,9 +1444,49 @@ True for the path that was asked for, `PRAGMA database_list` reports that same
 path back, and a log line saying where the database is can only ever repeat
 what it was told. The first end-to-end run of P4 therefore looked like a silent
 write failure and was not one. Only a look at the filesystem from **outside**
-the process settles where a file went. The packaged PyInstaller build is not
-redirected — measured with `Ocura.exe --self-check`, which reported a separate,
-empty database at the real location while the venv's copy held four rows.
+the process settles where a file went.
+
+That was MEASURED again on 2026-10-30, from outside. A file the venv wrote to
+`%LOCALAPPDATA%\OcuraProbe-…` existed only under `LocalCache`. The venv read
+`%LOCALAPPDATA%\Ocura\ocura.db` as 32,768 bytes, while PowerShell found
+2,396,160 bytes at that same path. Every database check ever run from the venv
+looked at the redirected copy. That includes the `ocura.db` opened by hand
+after P4, whose real rows looked like proof that the documented path worked.
+
+**Why it hid for so long: a tool that silently redirects a path is worse than
+one that fails.** A failure gets investigated. A redirect makes every check
+pass while pointing at the wrong file: the write succeeds, the file exists,
+the rows are there, and the path printed is the documented one. Nothing
+disagreed, so nothing was questioned. This is the same family as
+`QWidget.grab()` and the leaked stylesheet, where the verification environment
+is not production. It is the fifth instance:
+
+1. `grab()` rendering without the compositor
+2. the overlay captured in reduced motion
+3. the minimum-width test that never started a session
+4. a stylesheet one test left behind for the next
+5. now a Python whose filesystem is not the user's
+
+**What this does and does not say about the packaged app.** An earlier version
+of this entry said the PyInstaller build "is not redirected — measured with
+`Ocura.exe --self-check`". That was a look from inside the process, which this
+entry rules out. It showed only that the frozen app saw a *different* file from
+the venv (empty, against four rows), not where that file was. On 2026-10-30,
+PowerShell read the real file through Windows' own `winsqlite3.dll`. It held
+16,831 events in 13 runs, from 2026-09-19 to that afternoon. The only Ocura
+process, `dist\Ocura\Ocura.exe`, had started two seconds before the newest
+run's first event. So the **trial build** writing the real path is MEASURED.
+
+For the **installed** copy it is INFERRED: a PyInstaller exe is not an MSIX
+package, so nothing should redirect it. The installer test settles that. While
+the trial build runs, launching the installed one hands off to it through the
+single-instance guard, so new rows prove nothing unless the installed process
+is the only one alive.
+
+To look at a database without Python, use
+`scripts\read_db.ps1 -Path <file> -Sql <query>`, which opens it read-only
+through `winsqlite3.dll`. To develop against the documented path, build the
+venv from a python.org interpreter.
 
 **`git add -A` sweeps in whatever else is in the tree.** It has put unrelated
 work into the wrong commit twice: the presenter into
@@ -1428,6 +1536,11 @@ a derived read-only property on `TimerSnapshot`. A stored flag would be a second
 invisible state machine running alongside the visible one, free to disagree with
 it. A derived property cannot drift.
 
+The timer does store one flag, `_away`, and that is not a reversal of this
+rule. Absence cannot be derived from anything the timer holds. It is told,
+and storing what it was told is the only way to have it. See [Where that rule
+stops: an empty chair](#where-that-rule-stops-an-empty-chair).
+
 ## States
 
 ```
@@ -1447,3 +1560,64 @@ progress it had.
 Focus keeps accruing through `BREAK_DUE` and `DEFERRED`, so `focus_elapsed`
 stays honest about the real stretch at the screen instead of freezing the moment
 a break went untaken.
+
+### Where that rule stops: an empty chair
+
+The sentence above was written about a user who is still there, still working,
+and has not taken the offer. For that user it still holds, and a test pins it.
+It was never about an empty chair, and this is where the two cases part company.
+This section was added on 2026-10-30 rather than editing the sentence above.
+
+Kept accruing for an empty chair, `focus_elapsed` became the length of the
+absence. A deferred break was re-offered every thirty seconds while the user
+was away, each re-offer wrote a `BREAK_DUE` carrying the whole stretch so far,
+and the statistics page summed them. On real history, MEASURED from a copy of
+it, the page said **627 hours at the screen today** and **3,997 this week**, from
+one absence of 57 hours among others.
+
+So focus accrues in `FOCUSING`, `PRE_BREAK`, `BREAK_DUE` and `DEFERRED`,
+**and only while somebody is present.** Absence is a condition on counting,
+not a state. It can overlap any of those four states, an owed break stays owed
+through it, and a state would have had to remember what it interrupted the way
+`PAUSED` does, and change every `match` on `TimerState` for nothing. The timer
+is told `mark_away(since)` and `mark_present(at)`, both monotonic moments in
+the past, because absence is only ever noticed after it began. The stopwatch
+clamps them so that a past moment can move an edge but never count a stretch
+twice.
+
+**Why a stored `_away` flag, in a class that deleted its stored `break_owed`.**
+`break_owed` was derivable from the state, so storing it created a second
+source of truth free to drift from the first. Absence is not derivable from
+anything the domain holds. It is external information the domain is told, and
+remembering what it was told is the only way to have it at all. The same
+distinction is in the comment on the field.
+
+**One definition of away, the idle threshold.** The idle detector already
+decides when idle becomes absence, for "do not interrupt". The same threshold
+now decides "do not count". Away begins `threshold` seconds after the last
+input and ends at the next one, so a reader's short pause still counts, and
+nothing new was introduced to make that true. The threshold is a setting, so
+"away" moves with it. Someone who sets ten minutes has up to ten minutes of
+each absence counted as time at the screen. That is deliberate: they told
+Ocura what counts as away, and one definition serving both decisions is the
+point.
+
+**Sleep, MEASURED on 2026-10-30.** Across a 39-second S3 sleep, Ocura's
+monotonic clock and `GetTickCount64` both advanced by the sleep (37.811 s and
+37.782 s against 37.788 s of wall time), so both include suspend. But the idle
+count read **1.891 s** on the first sample after waking: the input that woke the
+machine reset it before Ocura ticked again. An idle-count rule alone therefore
+never sees a sleep. The rule is written over input moments instead: two
+consecutive input moments further apart than the threshold bound an absence,
+from the first plus the threshold to the second, whether Ocura was ticking
+through it or not. A gap in which Ocura saw nothing is not claimed as time at
+the screen, for the same reason long idle is not.
+
+Locked sessions: the idle count kept growing through a 56-second lock, at one
+second per second, so a lock longer than the threshold is absence by the same
+rule. MEASURED only up to 50 s, below the 120 s threshold. Beyond it, for
+instance once the display turns off, is UNVERIFIED.
+
+The dashboard says so when it happens: "Countdown paused. No activity
+detected. It continues when you are back." A countdown that stops with no
+reason given reads as a frozen program, which is a defect of its own.

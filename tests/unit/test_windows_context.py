@@ -159,8 +159,42 @@ def test_a_reader_is_deferred_not_credited(clock: FakeMonotonicClock, wall_clock
     context.poll()
     events = session.tick()
 
-    assert [event.kind for event in events] == [
-        SessionEventKind.BREAK_DUE,
-        SessionEventKind.BREAK_STARTED,
-    ]
+    # The re-offer is not written again; the break it offers is.
+    assert [event.kind for event in events] == [SessionEventKind.BREAK_STARTED]
     assert session.state is TimerState.ON_BREAK
+
+
+# --- presence ----------------------------------------------------------------
+
+
+def present_context(clock: FakeMonotonicClock, idle: Switch) -> WindowsContext:
+    detector = IdleDetector(idle, threshold=120.0)
+    return WindowsContext(DetectorChain(detector), idle=detector, clock=clock)
+
+
+def test_away_is_the_idle_detectors_own_threshold_and_follows_it(clock: FakeMonotonicClock):
+    """One definition of away: the moment Ocura stops interrupting is the
+    moment it stops counting, including after the user changes the setting."""
+    context = present_context(clock, Switch(0.0))
+    assert context.away_after == 120.0
+
+    context.set_idle_threshold(600.0)
+    assert context.away_after == 600.0
+
+
+def test_the_last_input_is_now_less_the_idle_count(clock: FakeMonotonicClock):
+    idle = Switch(42.5)
+    context = present_context(clock, idle)
+    assert context.last_input() == clock.monotonic() - 42.5
+
+
+def test_with_no_idle_signal_nothing_is_ever_counted_as_absence(clock: FakeMonotonicClock):
+    context = WindowsContext(DetectorChain(), clock=clock)
+    assert context.away_after == float("inf")
+    assert context.last_input() == clock.monotonic()
+
+
+def test_the_real_context_answers_presence(clock: FakeMonotonicClock):
+    from ocura.application.presenter import PresenceContext
+
+    assert isinstance(present_context(clock, Switch(0.0)), PresenceContext)

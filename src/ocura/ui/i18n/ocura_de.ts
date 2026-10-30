@@ -47,9 +47,8 @@
         <translation>Nicht jetzt</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="311"/>
+        <location filename="../../application/presenter.py" line="349"/>
         <source>A break in %1</source>
-        <extracomment>Set only while a break is owed and something is in the way. The pre-break warning is showing. One state, one moment to fire on. The break overlay should be on screen. Driven by ON_BREAK and nothing else — never by BREAK_DUE, which is a decision point, not an occurrence. False once the cap is reached, so a view can drop the control rather than offer an action that would be refused. False when no session is running, so a view can disable the control rather than offer an action that would be refused. The evidence line for the break screen. Chosen here rather than in the widget: it is language, and the language rules are testable without a display. Stable for the whole of one break, since it is keyed to the count of breaks finished and that does not move while one is running. The one sentence on the pre-break toast. Here rather than assembled in `OcuraApp` from an f-string, which is what it was and which meant the one message that has to arrive before a break was the one message no translator ever saw. Empty whenever the warning is not showing.</extracomment>
         <translation>Pause in %1</translation>
     </message>
 </context>
@@ -148,57 +147,57 @@
 <context>
     <name>Events</name>
     <message>
-        <location filename="../../application/presenter.py" line="442"/>
+        <location filename="../../application/presenter.py" line="482"/>
         <source>Session started</source>
         <translation>Sitzung gestartet</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="444"/>
+        <location filename="../../application/presenter.py" line="484"/>
         <source>Break started</source>
         <translation>Pause gestartet</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="450"/>
+        <location filename="../../application/presenter.py" line="490"/>
         <source>Break finished</source>
         <translation>Pause beendet</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="453"/>
+        <location filename="../../application/presenter.py" line="493"/>
         <source>Waiting — %1</source>
         <translation>Wartet — %1</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="456"/>
+        <location filename="../../application/presenter.py" line="496"/>
         <source>Waiting for a good moment</source>
         <translation>Wartet auf einen guten Moment</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="458"/>
+        <location filename="../../application/presenter.py" line="498"/>
         <source>Break postponed</source>
         <translation>Pause verschoben</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="461"/>
+        <location filename="../../application/presenter.py" line="501"/>
         <source>Rest credited — %1</source>
         <translation>Ruhe angerechnet — %1</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="464"/>
+        <location filename="../../application/presenter.py" line="504"/>
         <source>Rest credited</source>
         <translation>Ruhe angerechnet</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="466"/>
+        <location filename="../../application/presenter.py" line="506"/>
         <source>Reminders paused</source>
         <translation>Erinnerungen pausiert</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="468"/>
+        <location filename="../../application/presenter.py" line="508"/>
         <source>Reminders resumed</source>
         <translation>Erinnerungen fortgesetzt</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="470"/>
+        <location filename="../../application/presenter.py" line="510"/>
         <source>Session stopped</source>
         <translation>Sitzung beendet</translation>
     </message>
@@ -682,77 +681,88 @@ True while the three screens are being measured, so that rendering one does not 
 <context>
     <name>Status</name>
     <message>
-        <location filename="../../application/presenter.py" line="346"/>
+        <location filename="../../application/presenter.py" line="298"/>
+        <source>Countdown paused</source>
+        <extracomment>Seconds without input after which nobody is counted as at the screen — the idle detector&apos;s threshold, read from it rather than copied, so the moment Ocura stops interrupting and the moment it stops counting are the same moment. Set only while a break is owed and something is in the way. The pre-break warning is showing. One state, one moment to fire on. The break overlay should be on screen. Driven by ON_BREAK and nothing else — never by BREAK_DUE, which is a decision point, not an occurrence. False once the cap is reached, so a view can drop the control rather than offer an action that would be refused. False when no session is running, so a view can disable the control rather than offer an action that would be refused. The evidence line for the break screen. Chosen here rather than in the widget: it is language, and the language rules are testable without a display. Stable for the whole of one break, since it is keyed to the count of breaks finished and that does not move while one is running. The one sentence on the pre-break toast. Here rather than assembled in `OcuraApp` from an f-string, which is what it was and which meant the one message that has to arrive before a break was the one message no translator ever saw. Empty whenever the warning is not showing. Nobody is at the screen, so the countdown has stopped. The headline, the detail and the tray already say so in words.</extracomment>
+        <translation>Countdown angehalten</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="299"/>
+        <source>No activity detected. It continues when you are back.</source>
+        <translation>Keine Aktivität erkannt. Es geht weiter, sobald Sie zurück sind.</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="386"/>
         <source>Not running</source>
         <translation>Läuft nicht</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="347"/>
+        <location filename="../../application/presenter.py" line="387"/>
         <source>Start a session when you are ready.</source>
         <translation>Starten Sie eine Sitzung, wenn Sie bereit sind.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="351"/>
+        <location filename="../../application/presenter.py" line="391"/>
         <source>Focusing</source>
         <translation>Im Fokus</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="352"/>
+        <location filename="../../application/presenter.py" line="392"/>
         <source>Next break in %1.</source>
         <translation>Nächste Pause in %1.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="356"/>
+        <location filename="../../application/presenter.py" line="396"/>
         <source>Break soon</source>
         <translation>Pause bald</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="357"/>
+        <location filename="../../application/presenter.py" line="397"/>
         <source>In %1. Finish your thought.</source>
         <translation>In %1. Bringen Sie Ihren Gedanken zu Ende.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="363"/>
+        <location filename="../../application/presenter.py" line="403"/>
         <source>Break ready</source>
         <translation>Pause bereit</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="364"/>
+        <location filename="../../application/presenter.py" line="404"/>
         <source>Whenever suits you.</source>
         <translation>Wann immer es Ihnen passt.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="368"/>
+        <location filename="../../application/presenter.py" line="408"/>
         <source>On a break</source>
         <translation>In der Pause</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="369"/>
+        <location filename="../../application/presenter.py" line="409"/>
         <source>%1 left. Look somewhere far away.</source>
         <translation>Noch %1. Schauen Sie in die Ferne.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="375"/>
+        <location filename="../../application/presenter.py" line="415"/>
         <source>Reminders paused</source>
         <translation>Erinnerungen pausiert</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="376"/>
+        <location filename="../../application/presenter.py" line="416"/>
         <source>Nothing is counting. Resume when you like.</source>
         <translation>Nichts läuft mit. Setzen Sie fort, wann Sie mögen.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="379"/>
+        <location filename="../../application/presenter.py" line="419"/>
         <source>Waiting for a good moment</source>
         <translation>Wartet auf einen guten Moment</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="381"/>
+        <location filename="../../application/presenter.py" line="421"/>
         <source>Break owed — %1.</source>
         <translation>Pause offen — %1.</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="384"/>
+        <location filename="../../application/presenter.py" line="424"/>
         <source>Break owed.</source>
         <translation>Pause offen.</translation>
     </message>
@@ -779,34 +789,39 @@ True while the three screens are being measured, so that rendering one does not 
 <context>
     <name>Tray</name>
     <message>
-        <location filename="../../application/presenter.py" line="321"/>
+        <location filename="../../application/presenter.py" line="359"/>
         <source>Ocura — on a break, %1 left</source>
         <translation>Ocura — in der Pause, noch %1</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="325"/>
+        <location filename="../../application/presenter.py" line="363"/>
         <source>Ocura — waiting, %1</source>
         <translation>Ocura — wartet, %1</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="327"/>
+        <location filename="../../application/presenter.py" line="365"/>
+        <source>Ocura — countdown paused, no activity detected</source>
+        <translation>Ocura — Countdown angehalten, keine Aktivität erkannt</translation>
+    </message>
+    <message>
+        <location filename="../../application/presenter.py" line="367"/>
         <source>Ocura — break in %1</source>
         <translation>Ocura — Pause in %1</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="329"/>
+        <location filename="../../application/presenter.py" line="369"/>
         <source>Ocura — reminders paused</source>
         <translation>Ocura — Erinnerungen pausiert</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="331"/>
+        <location filename="../../application/presenter.py" line="371"/>
         <location filename="../app.py" line="472"/>
         <source>Ocura — not running</source>
         <extracomment>Shell state only, now that P5 has moved the preferences out: window geometry, and nothing a user would call a setting. A string every catalogue has, used only to ask whether one is really loaded. Marked rather than typed twice: if the tray&apos;s wording changes, this follows it, and a probe that silently stopped matching the catalogue would report every language as MISSING.</extracomment>
         <translation>Ocura — läuft nicht</translation>
     </message>
     <message>
-        <location filename="../../application/presenter.py" line="332"/>
+        <location filename="../../application/presenter.py" line="372"/>
         <source>Ocura — next break in %1</source>
         <translation>Ocura — nächste Pause in %1</translation>
     </message>

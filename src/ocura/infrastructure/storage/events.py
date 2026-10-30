@@ -38,6 +38,8 @@ class StoredEvent:
     #: lasted zero seconds, and a session being paused lasted nothing at all,
     #: and those are not the same row.
     duration: float | None = None
+    #: The focus block this row closed, in seconds. See `SessionEvent.focus`.
+    focus: float | None = None
 
     @property
     def event_kind(self) -> SessionEventKind | None:
@@ -87,8 +89,8 @@ class EventStore:
         """Append one event. Raises StorageError; never returns a failure quietly."""
         try:
             self._connection.execute(
-                "INSERT INTO events (run, at, kind, state, detail, duration) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO events (run, at, kind, state, detail, duration, focus) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     self._run,
                     _utc_text(event.at),
@@ -96,6 +98,7 @@ class EventStore:
                     str(event.state),
                     event.detail,
                     event.duration,
+                    event.focus,
                 ),
             )
         except sqlite3.Error as exc:
@@ -104,7 +107,7 @@ class EventStore:
     def recent(self, limit: int = 100) -> list[StoredEvent]:
         """The newest events first, which is the order every view of them wants."""
         return self._read(
-            "SELECT id, run, at, kind, state, detail, duration "
+            "SELECT id, run, at, kind, state, detail, duration, focus "
             "FROM events ORDER BY id DESC LIMIT ?",
             (limit,),
         )
@@ -112,7 +115,7 @@ class EventStore:
     def for_run(self, run: int | None = None) -> list[StoredEvent]:
         """One launch of the application, oldest first."""
         return self._read(
-            "SELECT id, run, at, kind, state, detail, duration "
+            "SELECT id, run, at, kind, state, detail, duration, focus "
             "FROM events WHERE run = ? ORDER BY id",
             (self._run if run is None else run,),
         )
@@ -137,6 +140,7 @@ class EventStore:
                 state=row["state"],
                 detail=row["detail"],
                 duration=None if row["duration"] is None else float(row["duration"]),
+                focus=None if row["focus"] is None else float(row["focus"]),
             )
             for row in rows
         ]

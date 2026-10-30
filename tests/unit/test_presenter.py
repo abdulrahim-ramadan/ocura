@@ -502,3 +502,116 @@ def test_the_null_journal_accepts_anything_and_says_nothing():
     journal = NullJournal()
     assert journal.record(an_event()) is None
     assert isinstance(journal, SessionJournal)
+
+
+# --- away --------------------------------------------------------------------
+
+
+class EmptyChair(ScriptedContext):
+    """A context with an input moment a test can set, and the real threshold."""
+
+    away_after = 120.0
+
+    def __init__(self, clock: FakeMonotonicClock) -> None:
+        super().__init__()
+        self._clock = clock
+        self.input_at = clock.monotonic()
+
+    def last_input(self) -> float:
+        return self.input_at
+
+    def touch(self) -> None:
+        self.input_at = self._clock.monotonic()
+
+
+@pytest.fixture
+def chair(clock: FakeMonotonicClock) -> EmptyChair:
+    return EmptyChair(clock)
+
+
+@pytest.fixture
+def watched(
+    schedule: BreakSchedule, clock: FakeMonotonicClock, wall_clock: FakeWallClock, chair: EmptyChair
+) -> BreakPresenter:
+    return BreakPresenter(schedule, clock, wall_clock, chair)
+
+
+def test_a_stopped_countdown_says_why(watched: BreakPresenter, clock: FakeMonotonicClock):
+    """A countdown that stops with no reason given reads as a frozen program."""
+    watched.start()
+    view = run_for(watched, clock, 300)
+
+    assert view.away is True
+    assert view.headline == "Countdown paused"
+    assert view.detail == "No activity detected. It continues when you are back."
+    assert "no activity detected" in watched.tooltip()
+    frozen = view.countdown_text
+    assert run_for(watched, clock, 600).countdown_text == frozen
+
+
+def test_the_countdown_moves_again_from_the_moment_they_return(
+    watched: BreakPresenter, clock: FakeMonotonicClock, chair: EmptyChair
+):
+    watched.start()
+    run_for(watched, clock, 300)
+    chair.touch()
+    view = run_for(watched, clock, 1)
+
+    assert view.away is False
+    assert view.headline == "Focusing"
+    # 120 s of the absence counted, as a reader's pause would, and the second since.
+    assert view.focus_elapsed == pytest.approx(121.0)
+
+
+def test_no_warning_is_shown_to_an_empty_chair(
+    watched: BreakPresenter, clock: FakeMonotonicClock, chair: EmptyChair, schedule: BreakSchedule
+):
+    """Absence beginning inside the warning: the countdown stops in PRE_BREAK,
+    and a toast counting down a number that is not moving is not shown."""
+    watched.start()
+    warning_at = schedule.focus_interval - schedule.pre_break_warning
+    # The last input lands so that absence begins five seconds into the warning.
+    last_touch = warning_at + 5.0 - EmptyChair.away_after
+    for _ in range(int(last_touch)):
+        clock.advance(1.0)
+        chair.touch()
+        watched.tick()
+    view = run_for(watched, clock, warning_at + 1.0 - last_touch)
+    assert view.state is TimerState.PRE_BREAK
+    assert view.warning_visible is True
+
+    view = run_for(watched, clock, 600)
+    assert view.state is TimerState.PRE_BREAK
+    assert view.away is True
+    assert view.warning_visible is False
+    assert view.warning_text == ""
+
+
+class Sticky(ScriptedContext):
+    """Answers the same thing on every assessment until told otherwise."""
+
+    def __init__(self, answer) -> None:
+        super().__init__()
+        self.answer = answer
+
+    def assess(self, snapshot):
+        self.calls.append(snapshot)
+        return self.answer
+
+
+def test_the_waiting_reason_is_the_current_one_not_the_first(
+    schedule: BreakSchedule, clock: FakeMonotonicClock, wall_clock: FakeWallClock
+):
+    """A deferral is written once, with the reason it began with; the screen
+    says what is holding the break back now."""
+    context = Sticky(Deferral(reason="fullscreen or presenting", retry_after=30.0))
+    presenter = BreakPresenter(schedule, clock, wall_clock, context)
+    presenter.start()
+    run_for(presenter, clock, schedule.focus_interval)
+    assert presenter.view().waiting_reason == "Fullscreen or presenting"
+
+    context.answer = Deferral(reason="session locked", retry_after=30.0)
+    view = run_for(presenter, clock, 31)
+    assert view.waiting_reason == "Screen locked"
+    deferrals = [line for line in view.events if line.text.startswith("Waiting")]
+    assert len(deferrals) == 1

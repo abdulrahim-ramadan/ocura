@@ -51,6 +51,10 @@ class IdleDetector:
     def threshold(self) -> float:
         return self._threshold
 
+    def idle_seconds(self) -> float:
+        """Seconds since the last input, from the same source assess() reads."""
+        return self._idle_seconds()
+
     def set_threshold(self, seconds: float) -> None:
         """Adopt a new threshold. Takes effect at the next assessment.
 

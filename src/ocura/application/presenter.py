@@ -85,6 +85,22 @@ class PollableContext(Protocol):
     def poll(self) -> None: ...
 
 
+@runtime_checkable
+class PresenceContext(Protocol):
+    """A context source that can say when somebody last touched the machine."""
+
+    #: Seconds without input after which nobody is counted as at the screen —
+    #: the idle detector's threshold, read from it rather than copied, so the
+    #: moment Ocura stops interrupting and the moment it stops counting are
+    #: the same moment.
+    @property
+    def away_after(self) -> float: ...
+
+    def last_input(self) -> float:
+        """The monotonic moment of the latest keyboard or mouse input."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class EventLine:
     at: datetime
@@ -154,6 +170,10 @@ class SessionView:
     #: translator ever saw. Empty whenever the warning is not showing.
     warning_text: str = ""
 
+    #: Nobody is at the screen, so the countdown has stopped. The headline,
+    #: the detail and the tray already say so in words.
+    away: bool = False
+
 
 class BreakPresenter:
     def __init__(
@@ -216,7 +236,16 @@ class BreakPresenter:
         # that began twenty minutes ago has to have been watched all along.
         if isinstance(self._context, PollableContext):
             self._context.poll()
+        # Before the tick, so a sleep that has just ended is taken out of the
+        # block before the timer decides whether the block is over.
+        if isinstance(self._context, PresenceContext):
+            self._session.observe_input(self._context.last_input(), self._context.away_after)
         self._absorb(self._session.tick())
+        # A deferral is written once, with the reason it began with; what is
+        # holding the break back can change while it waits, and the screen
+        # should say what it is now.
+        if (reason := self._session.deferral_reason) is not None:
+            self._waiting_reason = reason
         return self.view()
 
     def set_paused(self, paused: bool) -> SessionView:
@@ -261,6 +290,13 @@ class BreakPresenter:
         snapshot = self._session.snapshot()
         state = snapshot.state
         headline, detail = self._describe(state, snapshot.break_remaining, snapshot.focus_remaining)
+        # A countdown that stops with no reason given reads as a frozen
+        # program. Only where a countdown is what the screen is showing: while
+        # a break is owed, the waiting reason already says why.
+        counting_down = state in (TimerState.FOCUSING, TimerState.PRE_BREAK)
+        if snapshot.away and counting_down:
+            headline = translate("Status", "Countdown paused")
+            detail = translate("Status", "No activity detected. It continues when you are back.")
 
         if state is TimerState.ON_BREAK:
             span = self._schedule.break_duration
@@ -289,7 +325,9 @@ class BreakPresenter:
                 if snapshot.break_owed and self._waiting_reason
                 else None
             ),
-            warning_visible=state is TimerState.PRE_BREAK,
+            away=snapshot.away,
+            # Not to an empty chair, and not with a countdown that is not moving.
+            warning_visible=state is TimerState.PRE_BREAK and not snapshot.away,
             overlay_visible=state is TimerState.ON_BREAK,
             breaks_taken=self._breaks_taken,
             rests_credited=self._rests_credited,
@@ -309,7 +347,7 @@ class BreakPresenter:
             # into, so a translator is handed the whole window at once.
             warning_text=(
                 translate("BreakToast", "A break in %1").replace("%1", countdown)
-                if state is TimerState.PRE_BREAK
+                if state is TimerState.PRE_BREAK and not snapshot.away
                 else ""
             ),
         )
@@ -323,6 +361,8 @@ class BreakPresenter:
             )
         if view.waiting_reason:
             return translate("Tray", "Ocura — waiting, %1").replace("%1", view.waiting_reason)
+        if view.away and view.state in (TimerState.FOCUSING, TimerState.PRE_BREAK):
+            return translate("Tray", "Ocura — countdown paused, no activity detected")
         if view.state is TimerState.PRE_BREAK:
             return translate("Tray", "Ocura — break in %1").replace("%1", view.countdown_text)
         if view.state is TimerState.PAUSED:

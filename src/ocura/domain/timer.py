@@ -32,6 +32,9 @@ _BREAK_OWED = frozenset({TimerState.BREAK_DUE, TimerState.DEFERRED})
 
 #: Time at the screen keeps counting while a break goes untaken, so focus_elapsed
 #: stays honest about the real stretch rather than freezing at the interval.
+#: That is about a user who is still there and has not taken the offer. Whether
+#: anyone is there at all is a separate question, answered by `_away`: focus
+#: accrues in these states *and* only while the user is present.
 _FOCUS_ACCRUING = frozenset({TimerState.FOCUSING, TimerState.PRE_BREAK, *_BREAK_OWED})
 
 #: The user may ask for a break from any state where they are at the screen. Kept
@@ -52,11 +55,12 @@ _USER_MAY_SNOOZE = frozenset({TimerState.PRE_BREAK, TimerState.BREAK_DUE, TimerS
 class _Stopwatch:
     """Banked seconds plus, when running, the seconds since the last monotonic reading."""
 
-    __slots__ = ("_banked", "_started_at")
+    __slots__ = ("_banked", "_started_at", "_stopped_at")
 
     def __init__(self) -> None:
         self._banked = 0.0
         self._started_at: float | None = None
+        self._stopped_at: float | None = None
 
     @property
     def running(self) -> bool:
@@ -67,18 +71,32 @@ class _Stopwatch:
             return self._banked
         return self._banked + (now - self._started_at)
 
-    def set_running(self, running: bool, now: float) -> None:
+    def set_running(self, running: bool, now: float, at: float | None = None) -> None:
+        """Start or stop, by default now, or at a moment already past.
+
+        `at` exists for absence, which is only ever noticed after it began. It
+        is clamped so the stopwatch can neither give back time from before it
+        started nor take time from before it stopped: a moment in the past can
+        move an edge, never invent or erase a stretch the watch was not timing.
+        """
         if running == self.running:
             return
+        moment = now if at is None else min(at, now)
         if running:
-            self._started_at = now
+            if self._stopped_at is not None:
+                moment = max(moment, self._stopped_at)
+            self._started_at = moment
         else:
-            self._banked = self.elapsed(now)
+            assert self._started_at is not None
+            moment = max(moment, self._started_at)
+            self._banked += moment - self._started_at
             self._started_at = None
+            self._stopped_at = moment
 
     def reset(self) -> None:
         self._banked = 0.0
         self._started_at = None
+        self._stopped_at = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +106,10 @@ class TimerSnapshot:
     focus_remaining: float
     break_remaining: float
     deferral_remaining: float
+    #: Nobody has been at the screen for longer than the idle threshold, so
+    #: focus is not accruing. A view needs it: without a reason on screen, a
+    #: countdown that stops reads as a frozen program.
+    away: bool = False
 
     @property
     def break_owed(self) -> bool:
@@ -104,6 +126,14 @@ class BreakTimer:
         self._resume_state: TimerState | None = None
         self._retry_after: float | None = None
         self._snoozes = 0
+        # A stored flag, in a class that deleted its stored `break_owed` for
+        # being one. The difference is where the fact comes from. `break_owed`
+        # was derivable from the state, so storing it made a second source of
+        # truth free to drift from the first. Absence cannot be derived from
+        # anything the domain holds: it is external information the domain is
+        # told, through `mark_away` and `mark_present`, and remembering what
+        # it was told is the only way to have it at all.
+        self._away = False
         self._focus = _Stopwatch()
         self._break = _Stopwatch()
         self._deferral = _Stopwatch()
@@ -259,6 +289,28 @@ class BreakTimer:
         resumed, self._resume_state = self._resume_state, None
         self._enter(resumed, now)
 
+    def mark_away(self, since: float) -> None:
+        """Nobody has been at the screen since `since`, a monotonic moment.
+
+        Focus stops accruing from that moment, not from now: absence is only
+        ever noticed after it began, and the stretch between the two was not
+        time at the screen either. No state changes. Absence is not a phase of
+        the break cycle — it can overlap focusing, an owed break or a deferral
+        — so it is a condition on counting rather than a state of its own, and
+        an owed break stays owed through it.
+        """
+        if self._away:
+            return
+        self._away = True
+        self._apply_accrual(self._clock.monotonic(), at=since)
+
+    def mark_present(self, at: float) -> None:
+        """Somebody is back, as of `at`: the moment of the input that said so."""
+        if not self._away:
+            return
+        self._away = False
+        self._apply_accrual(self._clock.monotonic(), at=at)
+
     def tick(self) -> TimerState:
         """Apply whatever the passage of time has made true. Safe to call at any rate."""
         now = self._clock.monotonic()
@@ -296,6 +348,7 @@ class BreakTimer:
                 if self._state is TimerState.DEFERRED
                 else 0.0
             ),
+            away=self._away,
         )
 
     # --- internals --------------------------------------------------------
@@ -326,6 +379,9 @@ class BreakTimer:
         self._state = state
         # One place decides which stopwatches run in which state, so pause and
         # resume cannot drift apart from the transitions.
-        self._focus.set_running(state in _FOCUS_ACCRUING, now)
+        self._apply_accrual(now)
         self._break.set_running(state is TimerState.ON_BREAK, now)
         self._deferral.set_running(state is TimerState.DEFERRED, now)
+
+    def _apply_accrual(self, now: float, at: float | None = None) -> None:
+        self._focus.set_running(self._state in _FOCUS_ACCRUING and not self._away, now, at=at)

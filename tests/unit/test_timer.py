@@ -496,3 +496,128 @@ def test_tick_is_idempotent_between_advances(timer: BreakTimer, clock: FakeMonot
     assert timer.tick() is TimerState.BREAK_DUE
     assert timer.tick() is TimerState.BREAK_DUE
     assert timer.tick() is TimerState.BREAK_DUE
+
+
+# --- absence ----------------------------------------------------------------
+#
+# Absence is a condition on counting, not a state. These pin both halves: the
+# empty chair is not time at the screen, and a user who is there and has not
+# taken the offer still is (the P0 rule, unchanged for the case it was about).
+
+
+def test_focus_stops_accruing_from_the_moment_absence_began(
+    timer: BreakTimer, clock: FakeMonotonicClock
+):
+    timer.start()
+    began = clock.monotonic() + 100.0
+    clock.advance(400.0)
+    # Noticed at 400 s, but it began at 100 s: the 300 s between were not
+    # time at the screen either.
+    timer.mark_away(since=began)
+
+    assert timer.snapshot().focus_elapsed == 100.0
+    assert timer.snapshot().away is True
+    assert timer.state is TimerState.FOCUSING
+    clock.advance(10_000.0)
+    assert timer.snapshot().focus_elapsed == 100.0
+
+
+def test_focus_resumes_from_the_input_that_ended_the_absence(
+    timer: BreakTimer, clock: FakeMonotonicClock
+):
+    timer.start()
+    clock.advance(100.0)
+    timer.mark_away(since=clock.monotonic())
+    clock.advance(3600.0)
+    back = clock.monotonic()
+    clock.advance(5.0)
+    timer.mark_present(at=back)
+
+    assert timer.snapshot().away is False
+    assert timer.snapshot().focus_elapsed == 105.0
+
+
+def test_a_break_never_comes_due_to_an_empty_chair(timer: BreakTimer, clock: FakeMonotonicClock):
+    timer.start()
+    clock.advance(60.0)
+    timer.mark_away(since=clock.monotonic())
+    clock.advance(timer.schedule.focus_interval * 10)
+
+    assert timer.tick() is TimerState.FOCUSING
+    assert timer.snapshot().focus_remaining == timer.schedule.focus_interval - 60.0
+
+
+def test_an_owed_break_stays_owed_through_an_absence(
+    due_timer: BreakTimer, clock: FakeMonotonicClock
+):
+    due_timer.defer(retry_after=30.0)
+    owed_at = due_timer.snapshot().focus_elapsed
+    due_timer.mark_away(since=clock.monotonic())
+    clock.advance(57 * 3600.0)
+
+    assert due_timer.snapshot().break_owed is True
+    assert due_timer.snapshot().focus_elapsed == owed_at
+
+
+def test_a_present_user_who_has_not_taken_the_break_still_accrues(
+    due_timer: BreakTimer, clock: FakeMonotonicClock
+):
+    """P0's rule, for the case it was written about: still working, offer declined."""
+    due_timer.defer()
+    clock.advance(600.0)
+    assert due_timer.snapshot().focus_elapsed == due_timer.schedule.focus_interval + 600.0
+
+
+def test_a_past_moment_cannot_take_back_time_from_before_the_block(
+    timer: BreakTimer, clock: FakeMonotonicClock
+):
+    timer.start()
+    clock.advance(50.0)
+    timer.mark_away(since=clock.monotonic() - 10_000.0)
+    assert timer.snapshot().focus_elapsed == 0.0
+
+
+def test_a_return_dated_before_the_absence_counts_nothing_twice(
+    timer: BreakTimer, clock: FakeMonotonicClock
+):
+    """Input from before the absence began means there was no absence: the
+    stretch counts once, continuously, and the time before the stop is not
+    counted a second time."""
+    timer.start()
+    clock.advance(100.0)
+    timer.mark_away(since=clock.monotonic())
+    clock.advance(500.0)
+    timer.mark_present(at=clock.monotonic() - 10_000.0)
+    assert timer.snapshot().focus_elapsed == 600.0
+
+
+def test_absence_is_remembered_across_a_new_block(timer: BreakTimer, clock: FakeMonotonicClock):
+    """Being away is a fact about the world, not about the block that was running."""
+    timer.start()
+    timer.mark_away(since=clock.monotonic())
+    timer.start()
+    clock.advance(500.0)
+    assert timer.snapshot().focus_elapsed == 0.0
+
+
+def test_absence_during_a_pause_is_honoured_on_resume(timer: BreakTimer, clock: FakeMonotonicClock):
+    timer.start()
+    clock.advance(100.0)
+    timer.pause()
+    timer.mark_away(since=clock.monotonic())
+    clock.advance(500.0)
+    timer.resume()
+    clock.advance(500.0)
+    assert timer.snapshot().focus_elapsed == 100.0
+
+
+def test_marking_twice_changes_nothing(timer: BreakTimer, clock: FakeMonotonicClock):
+    timer.start()
+    clock.advance(100.0)
+    timer.mark_away(since=clock.monotonic())
+    clock.advance(100.0)
+    timer.mark_away(since=clock.monotonic())
+    timer.mark_present(at=clock.monotonic())
+    timer.mark_present(at=clock.monotonic())
+    clock.advance(10.0)
+    assert timer.snapshot().focus_elapsed == 110.0
