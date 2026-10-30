@@ -1488,6 +1488,30 @@ To look at a database without Python, use
 through `winsqlite3.dll`. To develop against the documented path, build the
 venv from a python.org interpreter.
 
+**A venv puts the tools beside `python.exe`. Nothing else promises to.** On
+2026-10-30, `build_release.py` launched PyInstaller as `pyinstaller.exe` from
+the folder that holds `sys.executable`. That is `.venv\Scripts` in a venv,
+where pip also puts the tools, and every local build passed for weeks. The
+release runner's Python is not a venv. There, `python.exe` sits in
+`...\Python\3.12.10\x64\` and pip puts the tools in `...\x64\Scripts\`. The
+first tagged release, v1.0.0, passed its version check, ruff and all 779
+tests, then failed on `FileNotFoundError: [WinError 2]` starting PyInstaller,
+and no Release was created. The fix is to run every tool through the
+interpreter, as `python -m PyInstaller` and `python -m ruff`. That finds the
+module wherever pip put it. v1.0.1 shipped with it.
+
+This is the **sixth** instance of the verification environment not being
+production, after the five listed in the Store Python entry above. The pattern,
+named plainly: **every environment difference in this project has been found by
+shipping into the other environment, never by reasoning about it.** The
+compositor, reduced motion, a session never started, a stylesheet left behind,
+the MSIX filesystem and the runner's Python layout were each visible in
+advance to anyone who asked "is this the environment the user is in?". Nobody
+asked, because every check that was run passed. So the question has to be
+asked on purpose, before trusting a green result: **what is different about
+where this will actually run, and has anything run there yet?** If nothing
+has, the first run there is the test, and it gets treated as one.
+
 **`git add -A` sweeps in whatever else is in the tree.** It has put unrelated
 work into the wrong commit twice: the presenter into
 `feat: add user-initiated break command`, and the overlay geometry into

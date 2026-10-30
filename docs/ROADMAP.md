@@ -280,6 +280,10 @@ stylesheet in five tests and leaves it. Since `180ac0e` the autouse
 `own_stylesheet` restores it, so nothing leaks, but the file should not depend
 on that guard to be correct.
 
+**Move the workflows off Node 20.** GitHub now forces `actions/checkout@v4`
+and `actions/setup-python@v5` onto Node 24 and warns on every run, in both `ci.yml` and `release.yml`. Bump both to versions
+that target Node 24. `upload-artifact@v4` is not named in the warning.
+
 **The long lock measurement.** Idle was measured climbing through a 56-second
 lock only. Not load-bearing since absence is computed from input moments, but
 "lock past 120 s and past display sleep" is still UNVERIFIED.
