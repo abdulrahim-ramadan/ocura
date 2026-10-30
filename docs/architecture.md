@@ -84,6 +84,56 @@ at its allowed 680px, with a busy week, the statistics page slid sideways by
 48px. This was never a German edge case. It shipped to every user, and the
 German text only made it wide enough to see.
 
+### A test whose expected value comes from the system under test agrees with it
+
+**An assertion whose expected value is read back from the system under test is
+not an assertion. It agrees with whatever the system did.**
+
+The bar tests in `test_rtl.py` and `test_statistics_page.py` rendered a bar and
+compared its pixels with the colour they read off the bar's own palette. The
+helper's docstring argued for doing exactly that: "The colour is read off the
+bar rather than forced onto it." The expected value was therefore whatever the
+palette happened to hold, and the test passed or failed on that, not on the bar.
+
+On the CI runner, after `e1a271f`, the bar tests failed even though the bar was
+drawn in the right place. With no stylesheet on the application, the palette is
+the system's, and in Windows 11 light mode its text colour is `0xe4000000`, black
+at 89% opacity. `.rgb()` drops the opacity and reported `0xff000000`, while the
+bar painted the translucent colour blended over the background, so no pixel could
+ever match. The development machine is in dark mode, where the same palette
+colour is opaque white, and there the oracle held. The first diagnosis said
+"black against black, painted indistinguishable from unpainted". That was wrong
+in its mechanism: the default render paints the window background before the
+widget, so an unpainted pixel was never black. The oracle was the defect, for
+the reason above.
+
+The helpers now set the colour through the bar's own stylesheet, fill the image
+with a sentinel the bar never paints, render without the window background, and
+compare full ARGB against the colour they set. Four deliberately broken bars
+(never mirror, always mirror, paint nothing, fill the width) each fail at least
+one test.
+
+### A suite that only passes in one order is not a suite
+
+**Every test file must pass on its own.** A result that depends on what ran
+before it is a fact about the run order, not about the program.
+
+The bar oracle had held on the runner only because `test_break_screen.py` left
+the dark stylesheet on the shared `QApplication`, which gave the bare bar an
+opaque theme colour. `test_minimum_width.py` cleaned up after itself, the next
+module ran without that stylesheet, and a defect that had been there all along
+appeared to be caused by a commit that only touched sizing. Measured at test
+setup, 88 of the 164 GUI tests started under a stylesheet an earlier test had
+left. Run alone, `test_statistics_page.py` failed four tests, and two icon tests
+in `test_theme_and_motion.py` aborted the interpreter with no output because
+nothing had created a `QApplication` before they built a pixmap.
+
+An autouse fixture in `tests/gui/conftest.py` now restores the application
+stylesheet after every test, and it requests `qapp`, so an application always
+exists first. The check is to run each GUI file alone in forced light mode
+(`QT_QPA_PLATFORM=windows:darkmode=0`), because the runner is in light mode and
+light mode is where these failures appeared.
+
 ## Layers
 
 ```
