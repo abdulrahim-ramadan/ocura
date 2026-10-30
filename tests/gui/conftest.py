@@ -39,6 +39,25 @@ def settings(tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def own_stylesheet(qapp):
+    """Every test starts with the application's stylesheet as it found it.
+
+    The stylesheet belongs to the QApplication the whole run shares, and a
+    test that sets one and leaves it decides what the next test's widgets
+    look like. Before this fixture, 88 of the GUI tests started under a
+    stylesheet some earlier test had left, and the bar tests passed only
+    because one had: the suite's verdict depended on its order.
+
+    Asking for `qapp` is half the point. A test that builds a pixmap without
+    one aborts the interpreter, with no traceback, unless an earlier test
+    happened to create the application first.
+    """
+    was = qapp.styleSheet()
+    yield
+    qapp.setStyleSheet(was)
+
+
+@pytest.fixture(autouse=True)
 def still():
     """Widget tests assert final values, so motion is off unless asked for.
 
