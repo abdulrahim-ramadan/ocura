@@ -270,6 +270,20 @@ of half-screen snapping on a 1366px laptop. An improvement, not a correction:
 the v1.0.0 minimum already fits every page, which
 `tests/gui/test_minimum_width.py` holds it to.
 
+**`build_release.py` deletes only what it created.** It starts with
+`shutil.rmtree(build)`, so anything else in `build\` goes with it. It
+nearly took the only copy of real history used for test patterns on
+2026-10-30.
+
+**`test_break_screen.py` cleans up its own stylesheet.** It sets the dark
+stylesheet in five tests and leaves it. Since `180ac0e` the autouse
+`own_stylesheet` restores it, so nothing leaks, but the file should not depend
+on that guard to be correct.
+
+**The long lock measurement.** Idle was measured climbing through a 56-second
+lock only. Not load-bearing since absence is computed from input moments, but
+"lock past 120 s and past display sleep" is still UNVERIFIED.
+
 ## Explicitly out of scope
 
 **Streaks and gamification.** A streak turns a missed break into a failure, and
