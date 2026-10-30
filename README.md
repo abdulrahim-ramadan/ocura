@@ -135,6 +135,14 @@ python -m ocura.ui.app
 
 Closing the window hides it to the tray; quit from the tray menu.
 
+If your Python came from the **Microsoft Store**, Ocura run this way does not
+keep its history in `%LOCALAPPDATA%\Ocura`. Windows silently redirects it to
+`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.13_<id>\LocalCache\Local\Ocura\`,
+while Ocura and Python both still report the usual path. That history is also
+separate from an installed Ocura's. Build the venv from a
+[python.org](https://www.python.org/downloads/windows/) interpreter if you want
+the real location.
+
 Run the tests:
 
 ```powershell
@@ -160,6 +168,33 @@ SmartScreen shows "Windows protected your PC" the first time you run
 warning means only that the publisher has not paid for a certificate — it is
 not a report about the file. The warning is expected and there is no way to
 suppress it short of buying a certificate.
+
+**An antivirus blocks or quarantines Ocura.** This is a different and more
+alarming experience than the SmartScreen warning. Instead of asking, the
+antivirus deletes or locks away the installer or `Ocura.exe`, often with a
+generic detection name such as `Gen:Variant`, `Heur` or `ML`. An unsigned build
+can be flagged this way, and it is a known consequence of Ocura having no
+code-signing certificate, not a sign that the file does something harmful.
+Heuristic scanners judge an unsigned executable by its shape, and Ocura's shape
+is a common one: the installer is an Inno Setup program that unpacks a helper
+into `%TEMP%` before it runs, the application is a PyInstaller bundle, and it can
+add itself to start at sign-in. It does not download anything, compile anything
+or write executables at runtime, and the only registry location it writes is
+under `HKEY_CURRENT_USER`. All of that can be checked in the source.
+
+What you can do, safest first:
+
+1. **Make sure the file came from this repository.** Download it only from the
+   [Releases page](https://github.com/abdulrahim-ramadan/ocura/releases). A copy
+   from anywhere else is a reason to trust the antivirus, not to override it.
+2. **Report it as a false positive** to your antivirus vendor. Every major
+   vendor has a submission form, and a cleared detection is cleared for
+   everyone who uses that vendor.
+3. **Build it yourself** from the source (see [Trial build](#trial-build)), so
+   you are trusting code you can read rather than a binary.
+4. **Restore it from quarantine** and add an exception for the Ocura folder
+   only, never for `%TEMP%` or a whole drive, and only if you are satisfied by
+   steps 1 to 3. Do not turn off your antivirus to install Ocura.
 
 **The tray icon is missing.** Windows files newly seen tray icons into the
 hidden overflow area — the chevron to the left of the clock — rather than the
